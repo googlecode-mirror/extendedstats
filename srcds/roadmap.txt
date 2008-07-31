@@ -1,0 +1,116 @@
+Version 2.0.0 (Umeko):
+
+Version 1.9.0 (Tamie):
+
+Version 1.8.0 (Sarina):
+
+Version 1.7.0 (Rebecca):
+
+Version 1.6.0 (Quintessa):
+
+Version 1.5.0 (Patricia):
+
+Version 1.4.0 (Ophelia):
+
+Version 1.3.0 (Nina):
+
+Version 1.2.0 (Manja):
+
+Version 1.1.0 (Laila):
+
+Version 1.0.0 (Kirsten):
+	python:
+		-working addons (event registring, command registring, new_player)
+		-working methods (correct calling and using)
+		-capture all important events/data
+		-support of gungame, extendedevents, wcs
+		-support of CSS, DoDS and TF2
+		-ingame statistics (rank, topX, statsme, methods, help, settings)
+		-multilingual support
+		-XA addon for changing configs
+	config:
+		-method choosing (CVAR)
+		-webstats submission method
+		-webstats details
+	websubmission:
+		-ftp
+		-php
+		-direct (mysql/sqlite)
+	web:
+		-databases:
+			-xml
+			-mysql
+			-sqlite
+		-frontend:
+			-php
+			-html/xml
+		-support for ingame methods
+		
+Version 0.9.0 (Jessica):
+		
+Version 0.8.0 (Isabella):
+		
+Version 0.7.0 (Hanna):
+		
+Version 0.6.0 (Gwendolyn):
+
+Version 0.5.0 (Fiona):
+	python:
+		-working addons (event registring, new_player)
+		-working methods (correct calling and using)
+		-capture all important events/data
+		-support of gungame, extendedevents, wcs
+		-support of CSS (maybe of TF2)
+		-ingame statistics (rank, topX, statsme, methods, help, settings)
+		-multilingual support
+	config:
+		-method choosing (CVAR)
+		-webstats submission method
+		-webstats details
+	websubmission:
+		-php
+		-direct (mysql/sqlite)
+	web:
+		-databases:
+			-mysql
+			-sqlite
+		-frontend:
+			-php
+			
+Version 0.4.0 (Eleanor):
+
+Version 0.3.0 (Desiree):
+			
+Version 0.2.0 (Caroline):
+	python:
+		-working addons (event registring, new_player)
+		-working methods (correct calling and using)
+		-capture all important events/data
+		-support of gungame, extendedevents, wcs
+		-support of CSS
+		-ingame statistics (rank, topX, statsme, methods, help, settings)
+		-multilingual support
+	config:
+		-method choosing (CVAR)
+		-configuration file
+
+Version 0.1.0 (Bettina):
+	python:
+		-working addons (event registring, new_player)
+		-working methods (correct calling and using)
+		-capture all important events/data
+		-support of gungame, extendedevents, wcs
+		-support of CSS
+		-ingame statistics (rank, topX, statsme, methods, help, settings)
+	config:
+		-method choosing (CVAR)
+		-configuration file
+		
+Version 0.0.5 (Angela):
+	-playable version
+		
+Version 0.0.1 (Anina):
+	-loadable version
+		
+Version 0.0.0 (Aylin):
+	-Start Project
