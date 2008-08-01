@@ -15,7 +15,7 @@ if EE:
         'dod_captures': 0,   
         'weapon_bought':{},
     }
-    dcfg = xs.addonDynCfg('extendedevents')
+    dcfg = extendedstats.addonDynCfg('extendedevents')
     if not dcfg['notify_longestjump']:
         dcfg['notify_longestjump'] =  1
     if not dcfg['notify_longestjump_all']:

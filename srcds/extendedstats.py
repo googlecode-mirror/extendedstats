@@ -31,7 +31,7 @@ psyco.full()
 LOG_ERRORS = True # Change to False if you don't want to have an errorlog (unrecommended)
 
 info = es.AddonInfo()
-info.version        = '0.0.5:97'
+info.version        = '0.0.5:98'
 info.versionname    = 'Angela'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
