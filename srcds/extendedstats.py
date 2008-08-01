@@ -21,7 +21,7 @@
 ###        IMPORTS        ####
 ##############################
 
-import es, playerlib, cPickle, vecmath, popuplib, time, path, sys, traceback, psyco
+import es, playerlib, cPickle, vecmath, popuplib, time, path, sys, traceback, psyco, hashlib
 psyco.full()
 
 ##############################
@@ -52,6 +52,7 @@ reggedscmd = []
 ignore_keys = []
 live_keys = {}
 data = {}
+errorhashes = []
 pending = {}
 new_player = {}
 cmdhelp = {}
@@ -63,6 +64,12 @@ cmdhelp = {}
 errorlog = xspath.joinpath('log.txt')
 if not errorlog.isfile():
     errorlog.touch()
+    
+def getmd5(text):
+    h = hashlib.md5()
+    h.update(text)
+    return h.hexdigest()
+    
 def excepter(type1, value1, traceback1):
     mystr = traceback.format_exception(type1, value1, traceback1)
     L = ['ERROR: %s' % time.strftime("%d %b %Y %H:%M:%S"),'XS Version: %s' % info.version,'']
@@ -72,8 +79,12 @@ def excepter(type1, value1, traceback1):
         es.dbgmsg(0, x[:-1])
         L.append(x[:-1])
     L.append('')
-    L += errorlog.lines(retain=False)
-    errorlog.write_lines(L)
+    hsh = getmd5(''.join(L))
+    if not hsh in errorhashes:
+        errorhashes.append(hsh)
+        L += errorlog.lines(retain=False)
+        errorlog.write_lines(L)
+        
 if LOG_ERRORS:
     sys.excepthook = excepter
     
@@ -684,7 +695,7 @@ def server_addban(ev):
             L.append('Players: %s (%s Bots)' % (len(es.getUseridList()),len(playerlib.getUseridList('#bot'))))
             L.append('Couldn\'t add ban, no steamid found')
             for var in ('networkid','userid','ip','name','duration','by','kicked'):
-                L.append('%s: %s' (var, ev[var]))
+                L.append('%s: %s' % (var, ev[var]))
             L.append('')
             L += errorlog.lines(retain=False)
             errorlog.write_lines(L)
