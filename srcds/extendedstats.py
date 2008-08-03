@@ -25,13 +25,19 @@ import es, playerlib, cPickle, vecmath, popuplib, time, path, sys, traceback, ps
 psyco.full()
 
 ##############################
+###  STATIC CONFIGURATION  ###
+##############################
+
+scfg = __import__('extendedstats.staticConfiguration',fromlist=['extendedstats'],level=0)
+if not 'default' in scfg.addonList:
+    scfg.addonList.append('default')
+
+##############################
 ###        GLOBALS        ####
 ##############################
 
-LOG_ERRORS = True # Change to False if you don't want to have an errorlog (unrecommended)
-
 info = es.AddonInfo()
-info.version        = '0.0.5:98'
+info.version        = '0.0.5:105'
 info.versionname    = 'Angela'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -56,6 +62,7 @@ errorhashes = []
 pending = {}
 new_player = {}
 cmdhelp = {}
+new_dcfg = {}
 
 ##############################
 ###     DEBUG HELPER      ####
@@ -85,7 +92,7 @@ def excepter(type1, value1, traceback1):
         L += errorlog.lines(retain=False)
         errorlog.write_lines(L)
         
-if LOG_ERRORS:
+if scfg.log_errors:
     sys.excepthook = excepter
     
 def es_map_start(ev):
@@ -99,13 +106,6 @@ def es_map_start(ev):
     
 def dbg(text):
     es.dbgmsg(int(dcfg['debuglevel']),text)
-    if dcfg['debuglevel'] == '0':
-        L = ['DEBUG: %s' % time.strftime("%d %b %Y %H:%M:%S"),'XS Version: %s' % info.version,'']
-        L.append('Mapname: %s' % str(es.ServerVar('eventscripts_currentmap')))
-        L.append('Players: %s (%s Bots)' % (len(es.getUseridList()),len(playerlib.getUseridList('#bot'))))
-        L.append(text)
-        L += errorlog.lines(retain=False)
-        errorlog.write_lines(L)
 
 ##############################
 ### LOAD, HELPERS, PUBLICS ###
@@ -121,6 +121,7 @@ def load():
     checkUpgrade()
     loadPackages()
     fillDatabase()
+    fillConfigurations()
     es.regsaycmd('!help','extendedstats/cmd_help')
     loadCVARS()
     dbg( 'XS: Registered methods:')
@@ -167,6 +168,11 @@ def loadAddons():
                     dbg( 'XS: new_player scheme added for %s' % name)
                 else:
                     dbg( 'XS: no new_player scheme in %s' % name)
+                if hasattr(addonmodule,'new_dcfg'):
+                    new_dcfg[name] = addonmodule.newplayer
+                    dbg( 'XS: new_dcfg scheme added for %s' % name)
+                else:
+                    dbg( 'XS: no new_dcfg scheme in %s' % name)                    
                 if callable(getattr(addonmodule, 'load', None)):
                     addonmodule.load()
                 else:
@@ -186,6 +192,11 @@ def loadAddons():
                     dbg( 'XS: new_player scheme added for %s' % name)
                 else:
                     dbg( 'XS: no new_player scheme in %s' % name)
+                if hasattr(addonmodule,'new_dcfg'):
+                    new_dcfg[name] = addonmodule.newplayer
+                    dbg( 'XS: new_dcfg scheme added for %s' % name)
+                else:
+                    dbg( 'XS: no new_dcfg scheme in %s' % name)             
                 if callable(getattr(addonmodule, 'load', None)):
                     addonmodule.load()
                 else:
@@ -229,11 +240,21 @@ def fillDatabase():
     for player in playerlib.getPlayerList('#human'):
         steamid = sid(int(player))
         if steamid not in data:
-            data[steamid] = new_player
+            data[steamid] = new_player.copy()
         data[steamid]['sessionstart'] = player.attributes['timeconnected']
         data[steamid]['lastseen'] = time.time()
         data[steamid]['lastname'] = player.attributes['name']
         data[steamid]['teamchange_time'] = data[steamid]['sessionstart']
+        
+def fillConfigurations():
+    keys = dcfg.keys()
+    for addon in new_dcfg:
+        currentcfg = new_dcfg[addon]
+        prefix = '' if addon == 'default' else '%s_' % addon
+        for var in currentcfg:
+            variable = prefix + var
+            if not variable in keys:
+                dcfg[variable] = currentcfg[var]
 
 def unloadCommands():
     for saycmd in reggedscmd:
@@ -291,8 +312,7 @@ def getScore(player,method):
     return methods[method](getPlayer(player))
 
 def getRank(player,method):
-    if method not in methods:
-        method = dcfg['default_method']
+    method = getMethod(method)
     x = 1
     score = getScore(player,method)
     for user in data:
@@ -303,8 +323,7 @@ def getRank(player,method):
     return x
 
 def getToplist(x,method=None):
-    if not method or method not in methods:
-        method = dcfg['default_method']
+    method = getMethod(method)
     tlist = []
     for player in data:
         if not player == 'info':
@@ -345,11 +364,13 @@ def sid(ev):
     if steamid == 'STEAM_ID_PENDING':
         steamid = 'FAKEID_%s' % userid
         pending[userid] = steamid
-        data[steamid] = new_player
+        data[steamid] = new_player.copy()
         data[steamid]['sessions'] += 1
         data[steamid]['sessionstart'] = time.time()
         data[steamid]['lastseen'] = time.time()
-        data[steamid]['teamchange_time'] = time.time()        
+        data[steamid]['teamchange_time'] = time.time()
+    elif not steamid in data:
+        data[steamid] = new_player.copy()
     return steamid
 
 def activateUser(userid, steamid):
@@ -384,6 +405,14 @@ def makeList(text,maxchars=40):
             textlist.append(text)
             text = False
     return textlist
+
+def getMethod(method=None):
+    keys = methods.keys()
+    if method in keys:
+        return method
+    if dcfg['default_method'] in keys:
+        return dcfg['default_method']
+    return methods[keys[0]]
     
 ##############################
 ###   INGAME INTERACTION   ###
@@ -682,6 +711,7 @@ def round_end(ev):
     for userid in playerlib.getUseridList('#human,#%s' % lt):
         data[es.getplayersteamid(userid)]['lose'] += 1
     saveDatabase()
+    dcfg.sync()
 
 def server_addban(ev):
     if not es.isbot(ev['userid']):
@@ -737,6 +767,7 @@ def dod_round_win(ev):
         data[es.getplayersteamid(userid)]['win'] += 1
     for userid in playerlib.getUseridList('#human,#%s' % lt):
         data[es.getplayersteamid(userid)]['lose'] += 1
+    dcfg.sync()
 
 def dod_bomb_exploded(ev):
     if not es.isbot(ev['userid']):
@@ -828,10 +859,6 @@ class dyncfg():
         return self.__cvars__
     
 dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_')
-if not 'defaul_method' in dcfg.keys():
-    dcfg['default_method'] = 'kdr'
-if not 'debuglevel' in dcfg.keys():
-    dcfg['debuglevel'] = '0'
     
 class addonDynCfg():
     def __init__(self,addonname):
@@ -845,9 +872,3 @@ class addonDynCfg():
     def __setitem__(self,var,val):
         dbg('XS: addonDyncfg %s setitem: %s: %s' % (self.__an__, var, val))
         dcfg['%s_%s' % (self.__an__,var)] = val
-
-##############################
-###  STATIC CONFIGURATION  ###
-##############################
-
-scfg = __import__('extendedstats.staticConfiguration',fromlist=['extendedstats'],level=0)

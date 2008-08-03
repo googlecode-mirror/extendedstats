@@ -15,11 +15,11 @@ if EE:
         'dod_captures': 0,   
         'weapon_bought':{},
     }
+    new_dcfg = {
+        'notify_longestjump' = '1',
+        'notify_longestjump_all' = '0',
+    }
     dcfg = extendedstats.addonDynCfg('extendedevents')
-    if not dcfg['notify_longestjump']:
-        dcfg['notify_longestjump'] =  1
-    if not dcfg['notify_longestjump_all']:
-        dcfg['notify_longestjump_all'] = 0
 
 def load():
     if EE:

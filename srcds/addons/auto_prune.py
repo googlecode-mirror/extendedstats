@@ -1,17 +1,18 @@
 import time
 from extendedstats import extendedstats as xs
 
+new_dcfg = {
+    'enabled' = '0',
+    'limit' = '30d',
+}
+
 dcfg = xs.addonDynCfg('auto_prune')
 
 def load():
-    if not dcfg['enable']:
-        dcfg['enable'] = '0'
-    if not dcfg['limit']:
-        dcfg['limit'] = '30d'
     xs.registerEvent('auto_prune','es_map_start',prune)
     
 def prune(ev):
-    if dcfg['enable'] == '1':
+    if dcfg['enabled'] == '1':
         limit = parseLimit(dcfg['limit'])
         for player in xs.data:
             if not player == 'info':

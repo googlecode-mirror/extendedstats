@@ -11,3 +11,7 @@ addonList = [] # list of addonnames to be importet (if allAddons False)
 
 allMethods = True # Just import all methods in the folder
 methodList =  [] # list of methods to be importet (if allMethods False)
+
+### Debugging ###
+
+log_errors = True # highly recommended until final release
