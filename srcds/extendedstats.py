@@ -21,7 +21,7 @@
 ###        IMPORTS        ####
 ##############################
 
-import es, playerlib, cPickle, vecmath, popuplib, time, path, sys, traceback, psyco, hashlib
+import es, playerlib, cPickle, vecmath, popuplib, time, path, sys, traceback, psyco, hashlib, sqlite3
 psyco.full()
 
 ##############################
@@ -37,8 +37,8 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.0.5:105'
-info.versionname    = 'Angela'
+info.version        = '0.1.0:106'
+info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
 info.author         = 'Ojii with loads of help by others'

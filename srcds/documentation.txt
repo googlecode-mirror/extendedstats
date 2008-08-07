@@ -1,0 +1,234 @@
+################################
+# EXTENDED STATS DOCUMENTATION #
+################################
+
+
+
+~~~ Preface ~~~
+
+This documentation is for eXtended Stats 0.1.0.106. The chapters about extending this addon
+require python knowledge.
+
+
+
+~~~ Credits ~~~
+
+Many thanks to:
+
+Saul
+GODJonez
+NATO_Hunter
+Jesse
+theresthatguy
+lindo81
+
+and of course
+
+mattie
+
+
+
+~~~ Bugs / Feature Requests / Discussion ~~~
+
+Please report any bugs you encounter to http://code.google.com/p/extendedstats/issues/list
+Please send me your feature requests to http://featurelist.org/extendedstats
+For general discussion visit the forum thread on http://forums.mattie.info/cs/forums/
+
+
+
+~~~ Chapter 1 - Installing and configuring eXtened Stats ~~~
+
+
+- 1.1: Preface -
+
+Before you install eXtened Stats, make sure you have the latest version of EventScripts
+(www.mattie.info/cs/) on your server. This addon requires at least version 2.0.0.247a for
+old source-engine games and version 2.1.0.281 for orangebox games.
+
+Also note that this addon will register some, for stats addons very common, saycommands like
+!statsme, !rank and !top10. It is not recommended to install eXtended Stats on any server where
+another stats addon is already installed!
+
+
+- 1.2: Optional Requirements -
+
+It's recommended to use the latest version of extendedevents when using eXtended Stats. The latest
+version is 4b which you can get here: http://forums.mattie.info/cs/forums/viewtopic.php?p=205084#205084
+
+Also note that this addon by default supports the WarCraft:Source addon by Jeff91 and 
+GunGame.
+
+
+- 1.3: Installing eXtended Stats -
+
+Get the newest version of eXtended Stats go to http://addons.eventscripts.com/addons/view/extendestats
+Unzip the downloaded file into your server's game directory, so that the file extendedstats.py is at:
+./cstrike/addons/eventscripts/extendedstats/extendedstats.py
+To load eXtended Stats by default, put 'es_load extendedstats' into the autoexec.cfg
+(Note: if you're using extendedevents as well, make sure that one is loaded BEFORE eXtended Stats!)
+
+
+- 1.4: Configuring eXtended Stats (static) -
+
+The file /addons/eventscripts/extendedstats/staticConfiguration.py contains some configurations
+which can only be changed by restarting the server. The following configuration variables are available:
+
+allAddons: Wheter all addons from the addons folder should be included or not (True/False)
+addonList : If allAddons is False, a list of names (strings) of addons should be placed here
+allMethods: Same as allAddons, but for methods
+methodList: Same as addonList but for methods
+log_errors: If this is False no log.txt will be generated. This log will make it easier to find errors tho.
+
+
+- 1.5: Configuring eXtended Stats (dynamic) -
+
+The dynamic configurations can be changed either ingame in the server console or by changing
+their value in the file /cfg/extendedstats.py. The list of those configuration variables depends
+on the amount of loaded addons. The core variables are:
+
+default_method: The default method
+debuglevel: The debug level, the higher the less spam in console the less lag
+
+To change those variables in the console prefix them with xs_
+To change variables by addons in the console preifx them with xs_addonname_ replacing addonname with
+the name of the addon.
+
+
+
+~~~ Chapter 2 - Using eXtended Stats ~~~
+
+By default eXtended Stats has the following saycommands (which can be used in console without the !
+as well):
+
+!rank [method]: displays your current rank. if no method is given the default method will be used
+!topX [method]: replace X with any integer. will display the toplist of X players using either
+				default method or the method given
+!help: provides ingame help about the commands
+!methods: will display a list of methods
+!settings: opens a menu where a player can change his settings
+
+
+
+~~~ Chapter 3 - Writing methods ~~~
+
+This chapter requires python skills!
+eXtended Stats is written to be extended! One of the two options is methods, which will be used
+to calculate stats. The method file should have a  load function which will be called when the
+method is imported and a unload function if things have to be done when the method is unloaded.
+
+
+- 3.1: imports -
+
+You have to import extendedstats in your method using:
+from extendedstats import extendedstats
+
+
+- 3.2: The load function -
+
+The load function takes no arguments! Here you should register all your methods using the interface
+extendedstats.registerMethod(packagename, methodname, function)
+	packagename (string): name of your file (without .py)
+	methodname (string): name of your method you want to register
+	function (function): the method in your file which will be called
+	
+	
+- 3.3: The method function -
+
+A method function (registered in extendedstats.registerMethod(...)) will always be called with
+a dictionary containing all information about the player. The keys for that dictionary can be found
+in the various new_player dictionaries in the addons.
+This method must return a numeric type.
+Note: A higher value is always better!
+
+
+- 3.4: More information -
+
+For more information have a look at the default methods (/methods/default.py)
+
+
+
+~~~ Chapter 4 - Writing addons ~~~
+
+This chapter requires python skills!
+The second way to extend eXtended Stats is writing addons, which can either contribute more data
+to the statistics, add more features (like auto_prune) or add new commands to eXtended Stats.
+
+
+- 4.4: imports -
+
+You have to import extendedstats in your addon using:
+from extendedstats import extendedstats
+
+
+- 4.2: new_player -
+
+Should your addon provide additional data to eXtended Stats you have to create a global dictionary
+called new_player with default values for all your keys!
+
+
+- 4.3: new_dcfg -
+
+Should your addon have dynamic configuration variables you have to create a global dictionary 
+called new_dcfg with default values for all your variables.
+To get access to this configuration values use:
+extendedstats.addonDynCfg(addonname)
+	addonname (string): the name of your file (without .py)
+The object returned by this function will behave like a dictionary.
+
+
+- 4.4: the load function -
+
+The load function takes no arguments! Here you register various things such as events, commands,
+'live keys' (4.7), 'ignore keys' (4.8) and add help messages to the help system of eXtended Stats.
+An unload function will be called when the addon is unloaded.
+
+
+- 4.5: registerEvent -
+ 
+registers a function to be called on a event. Events will be called with their event variables
+extendedstats.registerEvent(addonname,eventname,function)
+	addonname (string): name of your file (no .py)
+	eventname (string): name of the event to register
+	function (function): function in your addon to be called on event
+	
+	
+- 4.6: registerCommand -
+
+Register say- and/or clientcommands. Commandfunctions will be called with userid as first argument
+and a list of arguments as second argument.
+extendedstats.registerCommand(command,addonname,callback,clientcommand,saycommand,saycmdprefix,helplist)
+	commmand (string): command to register
+	addonname (string): name of your file (no .py)
+	callback (function): function to be called on command
+	clientcommand (bool): if False, no clientcommand is registered (default: True)
+	saycommand (bool): if False no clientcommand is registered (default: True)
+	saycmdprefix (string): prefix for saycommand (default: '!')
+	helplist (list of strings): list of strings for the help popup (default: ['No help available for this command'])
+	
+	
+- 4.7: registerLiveKey -
+
+Register a key to be synced *live* when he's needed
+extendedstats.registerLiveKey(name,callback)
+	name (string): name of the key
+	callback (function): function in your script which will be called. Should return the live value
+	
+	
+- 4.8: registerIgnoreKey -
+
+If you use a key for internal use only, you should register it as ignore key.
+The reason for this is the planned web-frontend. Ignore keys won't be submitted making it faster.
+extendedstats.registerIgnoreKey(name)
+	name (string): name of the key
+	
+
+- 4.9: addHelp -
+
+If you want to add help text to a command use addHelp
+extendedstats.addHelp(command,helplist)
+	command (string): command to add help text
+	helplist (list of strings): list of the text
+	
+- 4.10: More information -
+
+For more information have a look at the addons included.

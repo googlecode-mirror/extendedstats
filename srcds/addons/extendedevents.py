@@ -16,8 +16,8 @@ if EE:
         'weapon_bought':{},
     }
     new_dcfg = {
-        'notify_longestjump' = '1',
-        'notify_longestjump_all' = '0',
+        'notify_longestjump':'1',
+        'notify_longestjump_all': '0',
     }
     dcfg = extendedstats.addonDynCfg('extendedevents')
 
