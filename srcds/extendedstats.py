@@ -37,7 +37,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:106'
+info.version        = '0.1.0:107'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -169,7 +169,7 @@ def loadAddons():
                 else:
                     dbg( 'XS: no new_player scheme in %s' % name)
                 if hasattr(addonmodule,'new_dcfg'):
-                    new_dcfg[name] = addonmodule.newplayer
+                    new_dcfg[name] = addonmodule.new_dcfg
                     dbg( 'XS: new_dcfg scheme added for %s' % name)
                 else:
                     dbg( 'XS: no new_dcfg scheme in %s' % name)                    
@@ -391,6 +391,10 @@ def activateUser(userid, steamid):
                         data[steamid][key][subkey] = data[pending[userid]][key][subkey]
             else:
                 data[steamid][key] = data[pending[userid]][key]
+    data[steamid]['sessions'] += 1
+    data[steamid]['sessionstart'] = time.time()
+    data[steamid]['lastseen'] = time.time()
+    data[steamid]['teamchange_time'] = time.time()
     del data[pending[userid]]
     del pending[userid]
     
@@ -441,10 +445,7 @@ def helpCallback(userid,choice,name):
     if choice == '__nodoc__':
         allcmds = addoncommands.keys()
         doccmds = cmdhelp.keys()
-        nodocl = []
-        for key in allcmds:
-            if not key in doccmds:
-                nodocl.append(key)
+        nodocl = filter(lambda x: x not in doccmds,allcmds)
         if nodocl == []:
             nodocl = ['No undocumented Commands']
         nodoc = popuplib.easylist('no_doc',nodocl)
@@ -795,7 +796,7 @@ def dod_bomb_defused(ev):
 ### DYNAMIC CONFIGURATION  ###
 ##############################
 
-class dyncfg():
+class dyncfg(dict):
     def __init__(self,f,cvar_prefix=''):
         self.__filepath__ = path.path(f)
         self.__filepath__.touch()
@@ -819,6 +820,15 @@ class dyncfg():
                     self.__cvars__.append(self.__cvarprefix__ + var)
                     return val
         return None
+    
+    def __contains__(self,s):
+        if s in self.__d__:
+            return True
+        L = self.__filepath__.lines(retain=False)
+        for line in L:
+            if line.startswith(s):
+                return True
+        return False
 
     def __setitem__(self,s,v):
         s = str(s)

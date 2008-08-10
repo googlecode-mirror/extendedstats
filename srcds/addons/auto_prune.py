@@ -2,8 +2,8 @@ import time
 from extendedstats import extendedstats as xs
 
 new_dcfg = {
-    'enabled' = '0',
-    'limit' = '30d',
+    'enabled': '0',
+    'limit': '30d',
 }
 
 dcfg = xs.addonDynCfg('auto_prune')

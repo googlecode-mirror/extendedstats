@@ -74,7 +74,6 @@ def load():
     extendedstats.registerIgnoreKey('sessionstart')
     extendedstats.registerIgnoreKey('teamchange_time')
     extendedstats.registerIgnoreKey('current_team')
-    extendedstats.registerIgnoreKey('settings')
     extendedstats.registerLiveKey('team_2_time',liveTeam2)
     extendedstats.registerLiveKey('team_3_time',liveTeam3)
     extendedstats.registerLiveKey('team_1_time',liveSpec)
@@ -194,10 +193,14 @@ def xs_filter(userid, message, team):
     tokens = text.split(' ')
     cmd = tokens[0][1:] if tokens[0].startswith('!') else tokens[0]
     if cmd.startswith('top') and len(tokens) < 3:
-        displayTop(userid, int(cmd[3:]), tokens[1].lower() if len(tokens) == 2 else extendedstats.default_method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] )
+        method = tokens[1].lower() if len(tokens) == 2 else extendedstats.default_method
+        method =  method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
+        displayTop(userid, int(cmd[3:]),  )
     return (userid,text,team)
         
 def liveTime(player):
+    if not 'sessionstart' in extendedstats.data[player]:
+        return extendedstats.data[player]['time']
     return extendedstats.data[player]['time'] + time.time() - extendedstats.data[player]['sessionstart']
     
 def liveTeam2(player):
