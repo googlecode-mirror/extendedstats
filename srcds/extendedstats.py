@@ -37,7 +37,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:107'
+info.version        = '0.1.0:108'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -167,12 +167,7 @@ def loadAddons():
                     new_player.update(addonmodule.new_player)
                     dbg( 'XS: new_player scheme added for %s' % name)
                 else:
-                    dbg( 'XS: no new_player scheme in %s' % name)
-                if hasattr(addonmodule,'new_dcfg'):
-                    new_dcfg[name] = addonmodule.new_dcfg
-                    dbg( 'XS: new_dcfg scheme added for %s' % name)
-                else:
-                    dbg( 'XS: no new_dcfg scheme in %s' % name)                    
+                    dbg( 'XS: no new_player scheme in %s' % name)             
                 if callable(getattr(addonmodule, 'load', None)):
                     addonmodule.load()
                 else:
@@ -245,16 +240,6 @@ def fillDatabase():
         data[steamid]['lastseen'] = time.time()
         data[steamid]['lastname'] = player.attributes['name']
         data[steamid]['teamchange_time'] = data[steamid]['sessionstart']
-        
-def fillConfigurations():
-    keys = dcfg.keys()
-    for addon in new_dcfg:
-        currentcfg = new_dcfg[addon]
-        prefix = '' if addon == 'default' else '%s_' % addon
-        for var in currentcfg:
-            variable = prefix + var
-            if not variable in keys:
-                dcfg[variable] = currentcfg[var]
 
 def unloadCommands():
     for saycmd in reggedscmd:
@@ -282,14 +267,14 @@ def registerCommand(command,addonname,callback,clientcommand=True,saycommand=Tru
         helplist = makeList(helplist)
     cmdhelp[command] = helplist
     if clientcommand:
-        es.regclientcmd(command,'extendedstats/addonCommandListener')
-        addoncommands[command] = callback
-        reggedccmd.append(command)
-        dbg( 'XS: Registered clientcommand %s for %s' % (command,addonname))
+        es.regclientcmd('%s%s' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command),'extendedstats/addonCommandListener')
+        addoncommands['%s%s' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command)] = callback
+        reggedccmd.append('%s%s' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command))
+        dbg( 'XS: Registered clientcommand %s%s for %s' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command,addonname))
     if saycommand:
-        es.regsaycmd('%s%s' % (saycmdprefix,command),'extendedstats/addonCommandListener')
-        addoncommands['%s%s' % (saycmdprefix,command)] = callback
-        reggedscmd.append('%s%s' % (saycmdprefix,command))
+        es.regsaycmd('%s%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command),'extendedstats/addonCommandListener')
+        addoncommands['%s%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command)] = callback
+        reggedscmd.append('%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command))
         dbg( 'XS: Registered saycommand %s for %s' % ('%s%s' % (saycmdprefix,command),addonname))
         
 def registerLiveKey(name,callback):
@@ -797,13 +782,16 @@ def dod_bomb_defused(ev):
 ##############################
 
 class dyncfg(dict):
-    def __init__(self,f,cvar_prefix=''):
+    def __init__(self,f,cvar_prefix='',default={}):
         self.__filepath__ = path.path(f)
         self.__filepath__.touch()
         self.__cvarprefix__ = cvar_prefix
         self.__d__ = {}
         self.__cvars__ = []
         self.sync()
+        if default:
+            for key in filter(lambda x: not self.__contains__(x),default.keys()):
+                self[key] = default[key]
 
     def __getitem__(self,s):
         s = str(s)
@@ -868,12 +856,13 @@ class dyncfg(dict):
     def cvars(self):
         return self.__cvars__
     
-dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_')
-    
 class addonDynCfg():
-    def __init__(self,addonname):
+    def __init__(self,addonname,default={}):
         dbg('XS: addonDyncfg %s init' % addonname)
         self.__an__ = addonname
+        if default:
+            for key in filter(lambda x: x not in dcfg,default.keys()):
+                dcfg['%s_%s' % (addonname,key)] = default[key]
     
     def __getitem__(self,var):
         dbg('XS: addonDyncfg %s getitem: %s' % (self.__an__, var))
@@ -882,3 +871,9 @@ class addonDynCfg():
     def __setitem__(self,var,val):
         dbg('XS: addonDyncfg %s setitem: %s: %s' % (self.__an__, var, val))
         dcfg['%s_%s' % (self.__an__,var)] = val
+new_dcfg = {
+    'default_method': 'kdr',
+    'debuglevel': '0',
+    'command_prefix':'',
+}
+dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',new_dcfg)
