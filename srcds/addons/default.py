@@ -64,11 +64,6 @@ new_player = {
     },
 }
 
-new_dcfg = {
-    'default_method': 'kdr',
-    'debuglevel': '0',
-}
-
 def load():
     extendedstats.registerLiveKey('time',liveTime)
     extendedstats.registerIgnoreKey('sessionstart')
@@ -127,10 +122,11 @@ def cmd_statsme(userid,args):
     statshim.send(userid)
     
 def cmd_methods(userid,args):
-    es.tell(userid,'Available methods:')
     methodslist = ['Methods available:']
     methodslist += extendedstats.methods.keys()
-    methods = popuplist.easylist('methods_list',)
+    methods = popuplib.easylist('methods_list',)
+    for x in methodlist:
+        methods.additem(x)
     methods.send(userid)
     
 def cmd_settings(userid,args):
@@ -193,7 +189,7 @@ def xs_filter(userid, message, team):
     tokens = text.split(' ')
     cmd = tokens[0][1:] if tokens[0].startswith('!') else tokens[0]
     if cmd.startswith('top') and len(tokens) < 3:
-        method = tokens[1].lower() if len(tokens) == 2 else extendedstats.default_method
+        method = tokens[1].lower() if len(tokens) == 2 and tokens[1].lower in extendedstats.methods else extendedstats.dcfg['default_method']
         method =  method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
         displayTop(userid, int(cmd[3:]),  )
     return (userid,text,team)

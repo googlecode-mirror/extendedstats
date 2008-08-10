@@ -37,7 +37,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:108'
+info.version        = '0.1.0:109'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -425,6 +425,7 @@ def cmd_help():
     for key in helpkeys:
         helpmenu.addoption(key,key)
     helpmenu.addoption('__nodoc__','Undocumented Commands')
+    helpmenu.send(userid)
     
 def helpCallback(userid,choice,name):
     if choice == '__nodoc__':
