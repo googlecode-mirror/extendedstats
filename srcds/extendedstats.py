@@ -37,7 +37,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:109'
+info.version        = '0.1.0:110'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -122,7 +122,7 @@ def load():
     loadPackages()
     fillDatabase()
     fillConfigurations()
-    es.regsaycmd('!help','extendedstats/cmd_help')
+    es.regsaycmd('!%shelp' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else ''),'extendedstats/cmd_help')
     loadCVARS()
     dbg( 'XS: Registered methods:')
     for method in methods:
