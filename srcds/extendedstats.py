@@ -21,7 +21,7 @@
 ###        IMPORTS        ####
 ##############################
 
-import es, playerlib, cPickle, vecmath, popuplib, time, path, sys, traceback, psyco, hashlib, sqlite3
+import es, playerlib, cPickle, vecmath, popuplib, time, path, sys, traceback, psyco, hashlib
 psyco.full()
 
 ##############################
@@ -37,7 +37,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:110'
+info.version        = '0.1.0:112'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -121,9 +121,9 @@ def load():
     checkUpgrade()
     loadPackages()
     fillDatabase()
-    fillConfigurations()
     es.regsaycmd('!%shelp' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else ''),'extendedstats/cmd_help')
     loadCVARS()
+    loadMenus()
     dbg( 'XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
@@ -249,6 +249,27 @@ def unloadCommands():
             
 def loadCVARS():
     es.ServerVar('extendedstats_version', info.version).makepublic()
+    
+def loadMenus():
+    p = popuplib.easymenu('xs_help_menu','_popup_choice',helpCallback)
+    p.settitle('Helptopics for eXtended Stats:')
+    for key in cmdhelp:
+        p.addoption(key,key)
+    p.addoption('nodoc','Undocumented Commands')
+    
+    p = popuplib.easylist('xs_doc_nodoc')
+    allcmds = addoncommands.keys()
+    doccmds = cmdhelp.keys()
+    nodocl = filter(lambda x: x not in doccmds,allcmds)
+    if nodocl == []:
+        nodocl = ['No undocumented Commands']
+    for x in nodocl:
+        p.additem(x)
+    
+    for command in cmdhelp:
+        p = popuplib.easylist('xs_doc_%s' % command)
+        for x in cmdhelp[command]:
+            p.additem(x)
             
 ### Publics ###
         
@@ -274,7 +295,7 @@ def registerCommand(command,addonname,callback,clientcommand=True,saycommand=Tru
     if saycommand:
         es.regsaycmd('%s%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command),'extendedstats/addonCommandListener')
         addoncommands['%s%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command)] = callback
-        reggedscmd.append('%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command))
+        reggedscmd.append('%s%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command))
         dbg( 'XS: Registered saycommand %s for %s' % ('%s%s' % (saycmdprefix,command),addonname))
         
 def registerLiveKey(name,callback):
@@ -419,26 +440,10 @@ def addonCommandListener():
     
 def cmd_help():
     userid = es.getcmduserid()
-    helpkeys = cmdhelp.keys()
-    helpmenu = popuplib.easymenu('help_menu','_popup_choice',helpCallback)
-    helpmenu.settitle('Helptopics for eXtended Stats:')
-    for key in helpkeys:
-        helpmenu.addoption(key,key)
-    helpmenu.addoption('__nodoc__','Undocumented Commands')
-    helpmenu.send(userid)
+    popuplib.send('xs_help_menu',userid)
     
 def helpCallback(userid,choice,name):
-    if choice == '__nodoc__':
-        allcmds = addoncommands.keys()
-        doccmds = cmdhelp.keys()
-        nodocl = filter(lambda x: x not in doccmds,allcmds)
-        if nodocl == []:
-            nodocl = ['No undocumented Commands']
-        nodoc = popuplib.easylist('no_doc',nodocl)
-        nodoc.send(userid)
-    else:
-        doc = popuplib.easylist('doc',cmdhelp[choice])
-        doc.send(userid)
+    popuplib.send('xs_doc_%s' % choice,userid)
     
 ##############################
 ###         EVENTS         ###

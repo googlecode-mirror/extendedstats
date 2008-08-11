@@ -125,7 +125,7 @@ def cmd_methods(userid,args):
     methodslist = ['Methods available:']
     methodslist += extendedstats.methods.keys()
     methods = popuplib.easylist('methods_list',)
-    for x in methodlist:
+    for x in methodslist:
         methods.additem(x)
     methods.send(userid)
     
@@ -181,7 +181,9 @@ def displayTop(userid,x,method):
     for player in topplayers:
         displist.append('%s: %s (%s)' % (i,extendedstats.getName(player[0]),player[1]))
         i += 1
-    toplist = popuplib.easylist('top_list',displist)
+    toplist = popuplib.easylist('top_list')
+    for x in displist:
+        toplist.additem(displist)
     toplist.send(userid)
 
 def xs_filter(userid, message, team):
@@ -191,7 +193,7 @@ def xs_filter(userid, message, team):
     if cmd.startswith('top') and len(tokens) < 3:
         method = tokens[1].lower() if len(tokens) == 2 and tokens[1].lower in extendedstats.methods else extendedstats.dcfg['default_method']
         method =  method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
-        displayTop(userid, int(cmd[3:]),  )
+        displayTop(userid, int(''.join(filter(lambda x: x.isdigit(),cmd))), method)
     return (userid,text,team)
         
 def liveTime(player):
