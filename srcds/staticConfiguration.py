@@ -16,7 +16,6 @@ methodList =  [] # list of methods to be importet (if allMethods False)
 
 command_prefix = None # Note for saycommands this goes between ! and the command!
 
-
 ### Debugging ###
 
 debug = True # highly recommended until final release
