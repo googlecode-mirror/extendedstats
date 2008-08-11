@@ -203,7 +203,8 @@ def xs_filter(userid, message, team):
     if cmd.startswith('top') and len(tokens) < 3:
         method = tokens[1].lower() if len(tokens) == 2 and tokens[1].lower in extendedstats.methods else extendedstats.dcfg['default_method']
         method =  method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
-        displayTop(userid, int(''.join(filter(lambda x: x.isdigit(),cmd))), method)
+        x = ''.join(filter(lambda x: x.isdigit(),cmd))
+        displayTop(userid, int(x) if x != '' else 5, method)
     return (userid,text,team)
         
 def liveTime(player):

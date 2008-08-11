@@ -38,7 +38,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:114'
+info.version        = '0.1.0:115'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -122,7 +122,7 @@ def load():
     checkUpgrade()
     loadPackages()
     fillDatabase()
-    es.regsaycmd('!%shelp' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else ''),'extendedstats/cmd_help')
+    es.regsaycmd('!%shelp' % (scfg.command_prefix if scfg.command_prefix else ''),'extendedstats/cmd_help')
     loadCVARS()
     loadMenus()
     dbg( 'XS: Registered methods:')
@@ -289,15 +289,15 @@ def registerCommand(command,addonname,callback,clientcommand=True,saycommand=Tru
         helplist = makeList(helplist)
     cmdhelp[command] = helplist
     if clientcommand:
-        es.regclientcmd('%s%s' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command),'extendedstats/addonCommandListener')
-        addoncommands['%s%s' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command)] = callback
-        reggedccmd.append('%s%s' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command))
-        dbg( 'XS: Registered clientcommand %s%s for %s' % (dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command,addonname))
+        es.regclientcmd('%s%s' % (scfg.command_prefix if scfg.command_prefix else '',command),'extendedstats/addonCommandListener')
+        addoncommands['%s%s' % (scfg.command_prefix if scfg.command_prefix else '',command)] = callback
+        reggedccmd.append('%s%s' % (scfg.command_prefix if scfg.command_prefix else '',command))
+        dbg( 'XS: Registered clientcommand %s%s for %s' % (scfg.command_prefix if scfg.command_prefix else '',command,addonname))
     if saycommand:
-        es.regsaycmd('%s%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command),'extendedstats/addonCommandListener')
-        addoncommands['%s%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command)] = callback
-        reggedscmd.append('%s%s%s' % (saycmdprefix,dcfg['command_prefix'] if 'command_prefix' in dcfg else '',command))
-        dbg( 'XS: Registered saycommand %s for %s' % ('%s%s' % (saycmdprefix,command),addonname))
+        es.regsaycmd('%s%s%s' % (saycmdprefix,scfg.command_prefix if scfg.command_prefix else '',command),'extendedstats/addonCommandListener')
+        addoncommands['%s%s%s' % (saycmdprefix,scfg.command_prefix if scfg.command_prefix else '',command)] = callback
+        reggedscmd.append('%s%s%s' % (saycmdprefix,scfg.command_prefix if scfg.command_prefix else '',command))
+        dbg( 'XS: Registered saycommand %s for %s' % ('%s%s%s' % (saycmdprefix,scfg.command_prefix if scfg.command_prefix else '',command),addonname))
         
 def registerLiveKey(name,callback):
     global live_keys, ignore_keys
@@ -882,6 +882,5 @@ class addonDynCfg():
 new_dcfg = {
     'default_method': 'kdr',
     'debuglevel': '0',
-    'command_prefix':'',
 }
 dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',new_dcfg)
