@@ -14,4 +14,4 @@ methodList =  [] # list of methods to be importet (if allMethods False)
 
 ### Debugging ###
 
-log_errors = True # highly recommended until final release
+debug = True # highly recommended until final release

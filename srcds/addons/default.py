@@ -190,7 +190,8 @@ def displayTop(userid,x,method):
     for player in topplayers:
         displist.append('%s: %s (%s)' % (i,extendedstats.getName(player[0]),player[1]))
         i += 1
-    toplist = popuplib.easylist('top_list')
+    pplchck('xs_top_list_%s' % userid)
+    toplist = popuplib.easylist('xs_top_list_%s' % userid)
     for x in displist:
         toplist.additem(displist)
     toplist.send(userid)

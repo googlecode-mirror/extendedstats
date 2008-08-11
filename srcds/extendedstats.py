@@ -21,7 +21,8 @@
 ###        IMPORTS        ####
 ##############################
 
-import es, playerlib, cPickle, vecmath, popuplib, time, path, sys, traceback, psyco, hashlib
+import es, playerlib, vecmath, popuplib
+import time, path, cPickle, sys, traceback, psyco, hashlib, base64, urllib
 psyco.full()
 
 ##############################
@@ -37,7 +38,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:113'
+info.version        = '0.1.0:114'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -92,7 +93,7 @@ def excepter(type1, value1, traceback1):
         L += errorlog.lines(retain=False)
         errorlog.write_lines(L)
         
-if scfg.log_errors:
+if scfg.debug:
     sys.excepthook = excepter
     
 def es_map_start(ev):
@@ -759,6 +760,7 @@ def dod_round_win(ev):
         data[es.getplayersteamid(userid)]['win'] += 1
     for userid in playerlib.getUseridList('#human,#%s' % lt):
         data[es.getplayersteamid(userid)]['lose'] += 1
+    saveDatabase()
     dcfg.sync()
 
 def dod_bomb_exploded(ev):
