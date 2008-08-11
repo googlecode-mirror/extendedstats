@@ -9,13 +9,13 @@
 ###    Many Thanks To     ####
 ##############################
 #
-# Saul:             __import__ and especially for the hasattr() and callable(getattr())
-#                   in loadAddons()
-# GODJonez:         __import__() and especially for the dict.copy() hint
-# NATO_Hunter:      __import__()
+# Saul:             __import__ and especially for the hasattr(...) and callable(getattr(...)) in loadAddons(...)
+# GODJonez:         __import__(...) and especially for the dict.copy() hint
+# NATO_Hunter:      __import__(...)
 # Jesse:            Tester
 # theresthatguy:    Tester
 # lindo81:          Tester, ran the addon on his server for testing. Many many thanks!
+# darkranger:       Tester, ran the addon on his server for testing. Many many thanks!
 #
 ##############################
 ###        IMPORTS        ####
@@ -37,7 +37,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:112'
+info.version        = '0.1.0:113'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'

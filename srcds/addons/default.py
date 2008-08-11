@@ -79,6 +79,14 @@ def load():
     extendedstats.addHelp('topx','Usage: topX [method]. X should be an integer. method is optional. To get a list of methods use !methods')
     extendedstats.addHelp('top','Usage: topX [method]. X should be an integer. method is optional. To get a list of methods use !methods')
     es.addons.registerSayFilter(xs_filter)
+    menus()
+    
+def menus():
+    methodslist = ['Methods available:']
+    methodslist += extendedstats.methods.keys()
+    methods = popuplib.easylist('xs_methods_list',)
+    for x in methodslist:
+        methods.additem(x)
     
 def unload():
     es.addons.unregisterSayFilter(xs_filter)
@@ -118,19 +126,18 @@ def cmd_statsme(userid,args):
         lines.append('Rank (personal method): %s (%s)' % (pr,ps))
     lines.append('Top rank: %s (%s) using %s' % (top))
     lines.append('Low rank: %s (%s) using %s' % (low))
-    statshim = popuplib.easylist('statshim',lines)
+    pplchck('xs_statshim_%s' % userid)
+    statshim = popuplib.easylist('xs_statshim_%s' % userid)
+    for x in lines:
+        statshim.additem(x)
     statshim.send(userid)
     
 def cmd_methods(userid,args):
-    methodslist = ['Methods available:']
-    methodslist += extendedstats.methods.keys()
-    methods = popuplib.easylist('methods_list',)
-    for x in methodslist:
-        methods.additem(x)
-    methods.send(userid)
+    popuplib.send('xs_methods_list',userid)
     
 def cmd_settings(userid,args):
-    settingsmenu = popuplib.easymenu('settings_menu','_popup_choice',settingsCallback)
+    pplchck('xs_settings_menu_%s' % userid)
+    settingsmenu = popuplib.easymenu('xs_settings_menu_%s' % userid,'_popup_choice',settingsCallback)
     settingsmenu.settitle('Your eXtended Stats settings: Main')
     settingsmenu.addoption('method','Choose your personal method')
     settingsmenu.addoption('name','Choose your preferred name')
@@ -139,7 +146,8 @@ def cmd_settings(userid,args):
 def settingsCallback(userid,choice,name):
     player = extendedstats.getPlayer(es.getplayersteamid(userid))
     if choice == 'method':
-        methodmenu = popuplib.easymenu('methods_menu','_popup_choice',settingsCallback2)
+        pplchck('xs_methods_menu_%s' % userid)
+        methodmenu = popuplib.easymenu('xs_methods_menu_%s' % userid,'_popup_choice',settingsCallback2)
         methodmenu.settitle('Your eXtended Stats settings: Method')
         for method in extendedstats.methods.keys():
             if method == player['settings']['method']:
@@ -150,7 +158,8 @@ def settingsCallback(userid,choice,name):
         methodmenu.addoption(1,'Back to Main')
         methodmenu.send(userid)
     elif choice == 'name':
-        namemenu = popuplib.easymenu('name_menu','_popup_choice',settingsCallback2)
+        pplchck('xs_name_menu_%s' % userid)
+        namemenu = popuplib.easymenu('xs_name_menu_%s' % userid,'_popup_choice',settingsCallback2)
         namemenu.settitle('Your eXtended Stats settings: Name')
         for name in player['names']:
             if name == player['settings']['name']:
@@ -227,3 +236,7 @@ def liveSpec(player):
     if not extendedstats.data[player]['teamchange_time']:
         return extendedstats.data[player]['team_1_time'] + time.time() - extendedstats.data[player]['sessionstart']
     return extendedstats.data[player]['team_1_time'] + time.time() - extendedstats.data[player]['teamchange_time']
+
+def pplchck(name):
+    if popuplib.exists(name):
+        popuplib.delete(name)
