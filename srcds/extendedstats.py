@@ -704,20 +704,9 @@ def round_end(ev):
 
 def server_addban(ev):
     if not es.isbot(ev['userid']):
-        steamid = sid(ev)
         dbg( 'addban')
-        if steamid:
-            data[steamid]['ban'] += 1
-        else:
-            L = ['ADDBAN: %s' % time.strftime("%d %b %Y %H:%M:%S"),'XS Version: %s' % info.version,'']
-            L.append('Mapname: %s' % ev['mapname'])
-            L.append('Players: %s (%s Bots)' % (len(es.getUseridList()),len(playerlib.getUseridList('#bot'))))
-            L.append('Couldn\'t add ban, no steamid found')
-            for var in ('networkid','userid','ip','name','duration','by','kicked'):
-                L.append('%s: %s' % (var, ev[var]))
-            L.append('')
-            L += errorlog.lines(retain=False)
-            errorlog.write_lines(L)
+        if ev['networkid'] in data:
+            data[ev['networkid']]['ban'] += 1
 
 def smokegrenade_detonate(ev):
     if not es.isbot(ev['userid']):
