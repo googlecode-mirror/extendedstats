@@ -1,11 +1,4 @@
 ##############################
-###        ISSUES         ####
-##############################
-#
-# addban bugged, networkid doesn't seem to be the correct ev
-# added debug message for that
-#
-##############################
 ###    Many Thanks To     ####
 ##############################
 #
@@ -16,6 +9,7 @@
 # theresthatguy:    Tester
 # lindo81:          Tester, ran the addon on his server for testing. Many many thanks!
 # darkranger:       Tester, ran the addon on his server for testing. Many many thanks!
+# nexitem:          Tester, ran the addon on his server for testing. Many many thanks!
 #
 ##############################
 ###        IMPORTS        ####
@@ -38,7 +32,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:116'
+info.version        = '0.1.0:117'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -122,7 +116,8 @@ def load():
     checkUpgrade()
     loadPackages()
     fillDatabase()
-    es.regsaycmd('!%shelp' % (scfg.command_prefix if scfg.command_prefix else ''),'extendedstats/cmd_help')
+    es.regsaycmd(scfg.say_command_prefix + scfg.command_help,'extendedstats/cmd_help')
+    es.regclientcmd(scfg.command_help,'extendedstats/cmd_help')
     loadCVARS()
     loadMenus()
     dbg( 'XS: Registered methods:')
@@ -283,21 +278,22 @@ def registerEvent(name,event,callback): # string,string,method
     es.addons.registerForEvent(__import__('extendedstats.addons.%s' % name), event, callback)
     dbg( 'XS: Registered event %s for %s' % (event, name))
     
-def registerCommand(command,addonname,callback,clientcommand=True,saycommand=True,saycmdprefix='!',helplist=['No help available for this command']):
+def registerCommand(command,addonname,callback,clientcommand=True,saycommand=True,helplist=['No help available for this command']):
     global addoncommands, reggedccmd, reggedscmd, cmdhelp
     if type(helplist) == str:
         helplist = makeList(helplist)
     cmdhelp[command] = helplist
     if clientcommand:
-        es.regclientcmd('%s%s' % (scfg.command_prefix if scfg.command_prefix else '',command),'extendedstats/addonCommandListener')
-        addoncommands['%s%s' % (scfg.command_prefix if scfg.command_prefix else '',command)] = callback
-        reggedccmd.append('%s%s' % (scfg.command_prefix if scfg.command_prefix else '',command))
-        dbg( 'XS: Registered clientcommand %s%s for %s' % (scfg.command_prefix if scfg.command_prefix else '',command,addonname))
+        es.regclientcmd(command,'extendedstats/addonCommandListener')
+        addoncommands[command] = callback
+        reggedccmd.append(command)
+        dbg( 'XS: Registered clientcommand %s for %s' % (command,addonname))
     if saycommand:
-        es.regsaycmd('%s%s%s' % (saycmdprefix,scfg.command_prefix if scfg.command_prefix else '',command),'extendedstats/addonCommandListener')
-        addoncommands['%s%s%s' % (saycmdprefix,scfg.command_prefix if scfg.command_prefix else '',command)] = callback
-        reggedscmd.append('%s%s%s' % (saycmdprefix,scfg.command_prefix if scfg.command_prefix else '',command))
-        dbg( 'XS: Registered saycommand %s for %s' % ('%s%s%s' % (saycmdprefix,scfg.command_prefix if scfg.command_prefix else '',command),addonname))
+        command = scfg.say_command_prefix + command
+        es.regsaycmd(command,'extendedstats/addonCommandListener')
+        addoncommands[command] = callback
+        reggedscmd.append(command)
+        dbg( 'XS: Registered saycommand %s for %s' % (command,addonname))
         
 def registerLiveKey(name,callback):
     global live_keys, ignore_keys
@@ -310,6 +306,8 @@ def registerIgnoreKey(name):
         
 def addHelp(command,helptext):
     global cmdhelp
+    if not type(helptext) == list:
+        helptext = makeList(helptext)
     cmdhelp[command] = helptext
     dbg( 'XS: Added help text for %s' % command)
     

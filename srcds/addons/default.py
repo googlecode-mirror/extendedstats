@@ -2,6 +2,8 @@
 from extendedstats import extendedstats # Import eXtended Stats
 import es, time, popuplib
 
+scfg = extendedstats.scfg
+
 # This dict will be used to fill new players with default keys->values to prevent key not found errors.
 new_player = {
     'bomb_defused': 0,
@@ -72,12 +74,12 @@ def load():
     extendedstats.registerLiveKey('team_2_time',liveTeam2)
     extendedstats.registerLiveKey('team_3_time',liveTeam3)
     extendedstats.registerLiveKey('team_1_time',liveSpec)
-    extendedstats.registerCommand('rank','default_commands',cmd_rank,helplist=['Usage: !rank [method]','method is optional.','To get a list of methods use !methods'])
-    extendedstats.registerCommand('statsme','default_commands',cmd_statsme,helplist=['Usage: !statsme [method]',' method is optional.','To get a list of methods use !methods'])
-    extendedstats.registerCommand('methods','default_commands',cmd_methods,helplist=['Usage: !methods','Will show a list of available methods'])
-    extendedstats.registerCommand('settings','default_commands',cmd_settings,helplist=['Usage: !settings','Will open a menu to change personal settings'])
-    extendedstats.addHelp('topx','Usage: topX [method]. X should be an integer. method is optional. To get a list of methods use !methods')
-    extendedstats.addHelp('top','Usage: topX [method]. X should be an integer. method is optional. To get a list of methods use !methods')
+    extendedstats.registerCommand(scfg.command_rank,'default',cmd_rank,helplist=['Usage: !rank [method]','method is optional.','To get a list of methods use !methods'])
+    extendedstats.registerCommand(scfg.command_statsme,'default',cmd_statsme,helplist=['Usage: !statsme [method]',' method is optional.','To get a list of methods use !methods'])
+    extendedstats.registerCommand(scfg.command_methods,'default',cmd_methods,helplist=['Usage: !methods','Will show a list of available methods'])
+    extendedstats.registerCommand(scfg.command_settings,'default',cmd_settings,helplist=['Usage: !settings','Will open a menu to change personal settings'])
+    extendedstats.registerCommand(scfg.command_top,'default',cmd_top,True,False,['Usage: topX [method].','X should be an integer.','method is optional.','To get a list of methods use !methods'])
+    extendedstats.addHelp(scfg.command_top,'Usage: topX [method]. X should be an integer. method is optional. To get a list of methods use !methods')
     es.addons.registerSayFilter(xs_filter)
     menus()
     
@@ -90,6 +92,14 @@ def menus():
     
 def unload():
     es.addons.unregisterSayFilter(xs_filter)
+
+def cmd_top(userid,args):
+    myargs = [scfg.default_top_x,None]
+    for x in range(len(args)):
+        myargs[x] = args[x]
+    method = extendedstats.getMethod(myargs[1])
+    method = method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
+    displayTop(userid, int(myargs[0]), method)    
     
 def cmd_rank(userid,args):
     steamid = es.getplayersteamid(userid)
@@ -141,6 +151,7 @@ def cmd_settings(userid,args):
     settingsmenu.settitle('Your eXtended Stats settings: Main')
     settingsmenu.addoption('method','Choose your personal method')
     settingsmenu.addoption('name','Choose your preferred name')
+    settingsmenu.addoption('exit','Exit')
     settingsmenu.send(userid)
     
 def settingsCallback(userid,choice,name):
@@ -169,6 +180,8 @@ def settingsCallback(userid,choice,name):
         namemenu.addoption(2,'Reset setting')          
         namemenu.addoption(1,'Back to main')
         namemenu.send(userid)
+    elif choice == 'exit':
+        return
         
 def settingsCallback2(userid,choice,name):
     playersettings = extendedstats.data[es.getplayersteamid(userid)]['settings']
@@ -182,6 +195,8 @@ def settingsCallback2(userid,choice,name):
     else:
         playersettings[choice[0]] = choice[1]
         es.tell(userid,'Your eXtended Stats settings have been changed successfully.')
+    if scfg.settings_menu_resend:
+        cmd_settings(userid,None)
     
 def displayTop(userid,x,method):
     topplayers = extendedstats.getToplist(x,method)
@@ -204,7 +219,7 @@ def xs_filter(userid, message, team):
         method = tokens[1].lower() if len(tokens) == 2 and tokens[1].lower in extendedstats.methods else extendedstats.dcfg['default_method']
         method =  method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
         x = ''.join(filter(lambda x: x.isdigit(),cmd))
-        displayTop(userid, int(x) if x != '' else 5, method)
+        displayTop(userid, int(x) if x != '' else scfg.default_top_x, method)
     return (userid,text,team)
         
 def liveTime(player):

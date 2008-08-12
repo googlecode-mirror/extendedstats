@@ -2,6 +2,8 @@
 from extendedstats import extendedstats # Import eXtended Stats
 import es, path
 
+scfg = extendedstats.scfg
+
 GGP = path.path(es.getAddonPath('gungame'))
 
 if GGP.isdir(): # check if gungame is present on the server
@@ -29,7 +31,7 @@ def load():
         # The optional fourth argument is True by default. If False, no clientcommand will be registred
         # The optional fifth argument is True by default. If False, no saycommand will be registred.
         # The optional sixth argument is the saycommand prefix. By default it's '!'.
-        extendedstats.registerCommand('ggwon','gungame',ggwon_command)
+        extendedstats.registerCommand(scfg.command_gungame_ggwon,'gungame',ggwon_command)
     else:
         extendedstats.dbg( 'XS:GG: No gungame files found')
     
