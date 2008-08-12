@@ -25,6 +25,7 @@ command_statsme = 'statsme'
 command_help = 'help'
 command_settings = 'settings'
 command_top = 'top'
+command_commands = 'commands'
 
 command_gungame_ggwon = 'ggwon'
 

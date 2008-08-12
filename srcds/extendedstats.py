@@ -32,7 +32,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:118'
+info.version        = '0.1.0:119'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -54,10 +54,10 @@ ignore_keys = []
 live_keys = {}
 data = {}
 errorhashes = []
-pending = {}
+newconnected = []
 new_player = {}
 cmdhelp = {}
-new_dcfg = {}
+uniquecommands = []
 
 ##############################
 ###     DEBUG HELPER      ####
@@ -112,14 +112,16 @@ def load():
     dbg( '')
     dbg( 'XS: Loading...')
     loadDatabase()
+    loadPackages()
     loadAddons()
     checkUpgrade()
-    loadPackages()
     fillDatabase()
     es.regsaycmd(scfg.say_command_prefix + scfg.command_help,'extendedstats/cmd_help')
     es.regclientcmd(scfg.command_help,'extendedstats/cmd_help')
     loadCVARS()
     loadMenus()
+    es.regcmd('xs_clean','extendedstats/clean')
+    es.regcmd('xs_resetlog','extendedstats/resetlog')
     dbg( 'XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
@@ -129,6 +131,25 @@ def load():
     dcfg.sync()
     dbg( 'XS: Loaded successfully (%s: %s)' % (info.versionname,info.version))
     dbg( '')
+    
+def clean():
+    tbd = []
+    for player in data:
+        if not player:
+            tbd.append(player)
+            continue
+        if player == 'info':
+            continue
+        if player.startswith('FAKE'):
+            tbd.append(player)
+            continue
+        if not data[player]['sessionstart']:
+            data[player]['sessionstart'] = time.time()
+    for d in tbd:
+        del data[d]
+            
+def resetlog():
+    errorlog.write_text('')
 
 def unload():
     es.unregsaycmd('!help')
@@ -254,9 +275,9 @@ def loadMenus():
     p.addoption('nodoc','Undocumented Commands')
     
     p = popuplib.easylist('xs_doc_nodoc')
-    allcmds = addoncommands.keys()
+    p.settitle('Undocumented Commands:')
     doccmds = cmdhelp.keys()
-    nodocl = filter(lambda x: x not in doccmds,allcmds)
+    nodocl = filter(lambda x: x not in doccmds,uniquecommands)
     if nodocl == []:
         nodocl = ['No undocumented Commands']
     for x in nodocl:
@@ -264,6 +285,7 @@ def loadMenus():
     
     for command in cmdhelp:
         p = popuplib.easylist('xs_doc_%s' % command)
+        p.settitle('Help: %s' % command)
         for x in cmdhelp[command]:
             p.additem(x)
             
@@ -279,7 +301,8 @@ def registerEvent(name,event,callback): # string,string,method
     dbg( 'XS: Registered event %s for %s' % (event, name))
     
 def registerCommand(command,addonname,callback,clientcommand=True,saycommand=True,helplist=['No help available for this command']):
-    global addoncommands, reggedccmd, reggedscmd, cmdhelp
+    global addoncommands, reggedccmd, reggedscmd, cmdhelp, uniquecommands
+    uniquecommands.append(command)
     if type(helplist) == str:
         helplist = makeList(helplist)
     cmdhelp[command] = helplist
@@ -358,50 +381,11 @@ def getName(player):
 ### Helpers ###
             
 def sid(ev):
-    global pending, data
     if type(ev) == int:
         userid = ev
     else:
         userid = ev['userid']
-    if userid in pending:
-        return 'FAKEID_%s' % userid
-    steamid = es.getplayersteamid(userid)
-    if steamid == 'STEAM_ID_PENDING':
-        steamid = 'FAKEID_%s' % userid
-        pending[userid] = steamid
-        data[steamid] = new_player.copy()
-        data[steamid]['sessions'] += 1
-        data[steamid]['sessionstart'] = time.time()
-        data[steamid]['lastseen'] = time.time()
-        data[steamid]['teamchange_time'] = time.time()
-    elif not steamid in data:
-        data[steamid] = new_player.copy()
-    return steamid
-
-def activateUser(userid, steamid):
-    global data, pending
-    if steamid not in data:
-        data[steamid] = data[pending[userid]]
-    else:
-        for key in data[pending[userid]]:
-            if type(data[pending[userid]][key]) == int and key in data[steamid]:
-                data[steamid][key] += data[pending[userid]][key]
-            elif type(data[pending[userid]][key]) == dict:
-                if key not in data[steamid]:
-                    data[steamid][key] = {}
-                for subkey in data[pending[userid]][key]:
-                    if type(data[pending[userid]][key][subkey]) == int and subkey in data[steamid][key]:
-                        data[steamid][key][subkey] += data[pending[userid]][key][subkey]
-                    else:
-                        data[steamid][key][subkey] = data[pending[userid]][key][subkey]
-            else:
-                data[steamid][key] = data[pending[userid]][key]
-    data[steamid]['sessions'] += 1
-    data[steamid]['sessionstart'] = time.time()
-    data[steamid]['lastseen'] = time.time()
-    data[steamid]['teamchange_time'] = time.time()
-    del data[pending[userid]]
-    del pending[userid]
+    return es.getplayersteamid(userid)
     
 def makeList(text,maxchars=40):
     textlist = []
@@ -457,32 +441,53 @@ def server_cvar(ev):
     dbg('XS: dcfg: %s' % dcfg.cvars())
     if ev['cvarname'] in dcfg.cvars():
         dcfg[ev['cvarname'][3:]] = ev['cvarvalue']
-
+        
 def player_connect(ev):
-    global pending, data
+    global newconnected
+    newconnected.append(ev['userid'])
+
+def player_spawn(ev):
+    global data, newconnected
+    print 'player_spawn'
     if not es.isbot(ev['userid']):
-        steamid = 'FAKEID_%s' % ev['userid']
-        pending[ev['userid']] = steamid
+        steamid = es.getplayersteamid(ev['userid'])
+        if not steamid:
+            print 'NO STEAM ID!!!'
+            return
+        if steamid in data:
+            if not ev['userid'] in newconnected:
+                return
+            data[steamid]['sessions'] += 1
+            data[steamid]['sessionstart'] = time.time()
+            data[steamid]['lastseen'] = time.time()
+            data[steamid]['teamchange_time'] = time.time()
+            data[steamid]['changename'] += 1
+            newname = es.getplayername(ev['userid'])
+            if newname in data[steamid]['names']:
+                data[steamid]['names'][newname] += 1
+            else:
+                data[steamid]['names'][newname] = 1
+            data[steamid]['lastname'] = newname
+            newconnected.remove(ev['userid'])
+            dbg('player spawned (activate): %s' % steamid)
+            return
         data[steamid] = new_player.copy()
         data[steamid]['sessions'] += 1
         data[steamid]['sessionstart'] = time.time()
         data[steamid]['lastseen'] = time.time()
         data[steamid]['teamchange_time'] = time.time()
         data[steamid]['changename'] += 1
-        newname = ev['name']
+        newname = es.getplayername(ev['userid'])
         data[steamid]['names'][newname] = 1
         data[steamid]['lastname'] = newname
-        dbg( 'player connected: %s' % steamid)
+        newconnected.remove(ev['userid'])
+        dbg('new player spawned: %s' % steamid)
 
 def player_disconnect(ev):
-    global pending, data
+    global data
     if not es.isbot(ev['userid']):
         dbg( 'player disconnected: %s' % ev['userid'])
-        if ev['userid'] in pending:
-            dbg( 'player was pending')
-            del data[pending[ev['userid']]]
-            del pending[ev['userid']]
-        elif not es.isbot(ev['userid']):
+        if not es.isbot(ev['userid']):
             dbg( 'finnishing player session')
             steamid = ev['networkid']
             if steamid in data:
@@ -492,13 +497,6 @@ def player_disconnect(ev):
                     data[steamid]['team_%s_time' % data[steamid]['current_team']] += time.time() - data[steamid]['teamchange_time']
                     data[steamid]['teamchange_time'] = time.time()
                 data[steamid]['current_team'] = '0'
-    
-def es_player_validated(ev):
-    dbg( 'player validated')
-    userid = str(es.getuserid(ev['networkid']))
-    if userid in pending:
-        dbg( 'activating player FAKEID_%s to %s' % (userid, ev['networkid']))
-        activateUser(userid,ev['networkid'])
     
 def bomb_defused(ev):
     if not es.isbot(ev['userid']):

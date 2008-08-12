@@ -79,16 +79,19 @@ def load():
     extendedstats.registerCommand(scfg.command_methods,'default',cmd_methods,helplist=['Usage: !methods','Will show a list of available methods'])
     extendedstats.registerCommand(scfg.command_settings,'default',cmd_settings,helplist=['Usage: !settings','Will open a menu to change personal settings'])
     extendedstats.registerCommand(scfg.command_top,'default',cmd_top,True,False,['Usage: topX [method].','X should be an integer.','method is optional.','To get a list of methods use !methods'])
+    extendedstats.registerCommand(scfg.command_commands,'default',cmd_commands,helplist=['Shows a list of commands'])
     extendedstats.addHelp(scfg.command_top,'Usage: topX [method]. X should be an integer. method is optional. To get a list of methods use !methods')
     es.addons.registerSayFilter(xs_filter)
     menus()
     
 def menus():
+    pplchck('xs_methods_list')
     methodslist = ['Methods available:']
     methodslist += extendedstats.methods.keys()
-    methods = popuplib.easylist('xs_methods_list',)
+    m = popuplib.easylist('xs_methods_list')
+    m.settitle('Methods List:')
     for x in methodslist:
-        methods.additem(x)
+        m.additem(x)
     
 def unload():
     es.addons.unregisterSayFilter(xs_filter)
@@ -99,7 +102,19 @@ def cmd_top(userid,args):
         myargs[x] = args[x]
     method = extendedstats.getMethod(myargs[1])
     method = method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
-    displayTop(userid, int(myargs[0]), method)    
+    displayTop(userid, int(myargs[0]), method)
+    
+def cmd_commands(userid,args):
+    if popuplib.exists('xs_commands_list'):
+        popuplib.send('xs_commands_list',userid)
+    else:
+        c = popuplib.easylist('xs_commands_list')
+        c.settitle('Command list:')
+        for x in extendedstats.reggedccmd:
+            c.additem('%s (console)' % x)
+        for x in extendedstats.reggedscmd:
+            c.additem('%s (chat)' % x)
+        c.send(userid)
     
 def cmd_rank(userid,args):
     steamid = es.getplayersteamid(userid)
@@ -138,6 +153,7 @@ def cmd_statsme(userid,args):
     lines.append('Low rank: %s (%s) using %s' % (low))
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
+    statshim.settitle('Your stats:')
     for x in lines:
         statshim.additem(x)
     statshim.send(userid)
@@ -201,20 +217,19 @@ def settingsCallback2(userid,choice,name):
 def displayTop(userid,x,method):
     topplayers = extendedstats.getToplist(x,method)
     displist = []
-    i = 1
-    for player in topplayers:
-        displist.append('%s: %s (%s)' % (i,extendedstats.getName(player[0]),player[1]))
-        i += 1
     pplchck('xs_top_list_%s' % userid)
     toplist = popuplib.easylist('xs_top_list_%s' % userid)
-    for x in displist:
-        toplist.additem(displist)
+    toplist.settitle('Top %s (%s):' % (x,method))
+    i = 1
+    for player in topplayers:
+        toplist.additem('%s: %s (%s)' % (i,extendedstats.getName(player[0]),player[1]))
+        i += 1
     toplist.send(userid)
 
 def xs_filter(userid, message, team):
     text = message.strip('"')
     tokens = text.split(' ')
-    cmd = tokens[0][1:] if tokens[0].startswith('!') else tokens[0]
+    cmd = tokens[0]
     if cmd.startswith(scfg.say_command_prefix + scfg.command_top) and len(tokens) < 3:
         method = tokens[1].lower() if len(tokens) == 2 and tokens[1].lower in extendedstats.methods else extendedstats.dcfg['default_method']
         method =  method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
