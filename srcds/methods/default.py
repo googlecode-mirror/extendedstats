@@ -2,8 +2,10 @@
 
 # You have to import extendedstats to register your methods
 from extendedstats import extendedstats
+import path, es
 
 packagename = 'default'
+EEP = path.path(es.getAddonPath('extendedevents'))
 
 # This function will be called when your method is imported.
 def load():
@@ -15,7 +17,8 @@ def load():
     extendedstats.registerMethod(packagename,'kills',PureKills)
     extendedstats.registerMethod(packagename,'team_kdr',tKDR)
     extendedstats.registerMethod(packagename,'killsperminute',kpm)
-    extendedstats.registerMethod(packagename,'money',money)
+    if EEP.isdir():
+        extendedstats.registerMethod(packagename,'money',money)
     extendedstats.registerMethod(packagename,'score',score)
     extendedstats.registerMethod(packagename,'damage',damage)
     

@@ -215,7 +215,7 @@ def xs_filter(userid, message, team):
     text = message.strip('"')
     tokens = text.split(' ')
     cmd = tokens[0][1:] if tokens[0].startswith('!') else tokens[0]
-    if cmd.startswith('%stop' % extendedstats.scfg.command_prefix) and len(tokens) < 3:
+    if cmd.startswith(scfg.say_command_prefix + scfg.command_top) and len(tokens) < 3:
         method = tokens[1].lower() if len(tokens) == 2 and tokens[1].lower in extendedstats.methods else extendedstats.dcfg['default_method']
         method =  method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
         x = ''.join(filter(lambda x: x.isdigit(),cmd))
