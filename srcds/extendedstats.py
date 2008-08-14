@@ -32,7 +32,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:119'
+info.version        = '0.1.0:121'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -90,15 +90,6 @@ def excepter(type1, value1, traceback1):
 if scfg.debug:
     sys.excepthook = excepter
     
-def es_map_start(ev):
-    L = ['NEWMAP: %s' % time.strftime("%d %b %Y %H:%M:%S"),'XS Version: %s' % info.version,'']
-    L.append('Mapname: %s' % ev['mapname'])
-    L.append('Players: %s (%s Bots)' % (len(es.getUseridList()),len(playerlib.getUseridList('#bot'))))
-    L.append('')
-    L += errorlog.lines(retain=False)
-    errorlog.write_lines(L)
-    dcfg.sync()
-    
 def dbg(text):
     es.dbgmsg(int(dcfg['debuglevel']),text)
 
@@ -145,6 +136,9 @@ def clean():
             continue
         if not data[player]['sessionstart']:
             data[player]['sessionstart'] = time.time()
+        for key in data[player]:
+            if not key in new_player:
+                del data[player][key]
     for d in tbd:
         del data[d]
             
@@ -356,20 +350,16 @@ def getToplist(x,method=None):
     for player in data:
         if not player == 'info':
             tlist.append((getScore(player,method),player))
-    tlist.sort()
-    toplist = []
-    for i in range(x) if len(tlist) >= x else range(len(tlist)):
-        toplist.append((tlist[i][1],tlist[i][0]))
-    return toplist
+    tlist.sort(reverse=True)
+    return tlist
 
 def getPlayer(player):
     live = {}
     for key in data[player]:
         if not key in ignore_keys:
             live[key] = data[player][key]
-        for lkey in live_keys:
-            if lkey == key:
-                live[key] = live_keys[key](player)
+        if key in live_keys:
+            live[key] = live_keys[key](player)
     return live
 
 def getName(player):
@@ -406,6 +396,9 @@ def getMethod(method=None):
     if dcfg['default_method'] in keys:
         return dcfg['default_method']
     return methods[keys[0]]
+
+def addonIsLoaded(addonname):
+    return bool(filter(lambda x: 'extendedevents' in str(x),es.addons.getAddonList()))
     
 ##############################
 ###   INGAME INTERACTION   ###
@@ -435,10 +428,6 @@ def helpCallback(userid,choice,name):
 ### Builtin Events ###
 
 def server_cvar(ev):
-    dbg('XS: server_cvar')
-    dbg('XS: cvar: %s' % ev['cvarname'])
-    dbg('XS: value: %s' % ev['cvarvalue'])
-    dbg('XS: dcfg: %s' % dcfg.cvars())
     if ev['cvarname'] in dcfg.cvars():
         dcfg[ev['cvarname'][3:]] = ev['cvarvalue']
         
@@ -757,6 +746,9 @@ def dod_bomb_defused(ev):
     if not es.isbot(ev['userid']):
         dbg( 'bomb defused')
         data[sid(ev)]['bomb_defused'] += 1
+    
+def es_map_start(ev):
+    dcfg.sync()
 
 ### ExtendedEvents ###
 #
@@ -849,23 +841,24 @@ class dyncfg(dict):
     def cvars(self):
         return self.__cvars__
     
-class addonDynCfg():
+    def as_bool(self,s):
+        return bool(self[s])
+    
+class addonDynCfg(dict):
     def __init__(self,addonname,default={}):
-        dbg('XS: addonDyncfg %s init' % addonname)
         self.__an__ = addonname
         if default:
             for key in filter(lambda x: x not in dcfg,default.keys()):
                 dcfg['%s_%s' % (addonname,key)] = default[key]
     
     def __getitem__(self,var):
-        dbg('XS: addonDyncfg %s getitem: %s' % (self.__an__, var))
         return dcfg['%s_%s' % (self.__an__,var)]
     
     def __setitem__(self,var,val):
-        dbg('XS: addonDyncfg %s setitem: %s: %s' % (self.__an__, var, val))
         dcfg['%s_%s' % (self.__an__,var)] = val
-new_dcfg = {
+default = {
     'default_method': 'kdr',
     'debuglevel': '0',
+    'statsme_methods': '',
 }
-dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',new_dcfg)
+dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)

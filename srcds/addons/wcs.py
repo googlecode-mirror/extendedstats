@@ -2,8 +2,8 @@
 
 import path, es
 from extendedstats import extendedstats as xs
-wcsp = path.path(es.getAddonPath('wcs'))
-if wcsp.isdir():
+wcsIsLoaded = xs.addonIsLoaded('wcs')
+if wcsIsLoaded:
     wcs = __import__('wcs.wcs',fromlist=['wcs'],level=0)
     new_player = {
         'wcs_level': 0,
@@ -16,7 +16,7 @@ if wcsp.isdir():
     }
 
 def load():
-    if wcsp.isdir():
+    if wcsIsLoaded:
         xs.registerLiveKey('wcs_level',wcs_level)
         xs.registerLiveKey('wcs_totalxp',wcs_totalxp)
         xs.registerLiveKey('wcs_racexp',wcs_racexp)

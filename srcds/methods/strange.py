@@ -2,10 +2,9 @@ from extendedstats import extendedstats
 import path, es
 
 packagename = 'strange'
-eep = path.path(es.getAddonPath('extendedevents'))
 
 def load():
-    if eep.isdir():
+    if extendedstats.addonIsLoaded('extendedevents'):
         extendedstats.registerMethod(packagename,'jumpdistance',jumpdistance)
         extendedstats.registerMethod(packagename,'longestjump',longestjump)
     extendedstats.registerMethod(packagename,'falldamage',falldamage)

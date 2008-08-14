@@ -4,8 +4,7 @@
 from extendedstats import extendedstats
 import es, vecmath, path
 
-EEP = path.path(es.getAddonPath('extendedevents'))
-EE = EEP.isdir()
+EE = extendedstats.addonIsLoaded('extendedevents')
 if EE:
     new_player = {
         'money': 0,
@@ -15,11 +14,11 @@ if EE:
         'dod_captures': 0,   
         'weapon_bought':{},
     }
-    new_dcfg = {
+    default = {
         'notify_longestjump':'1',
         'notify_longestjump_all': '0',
     }
-    dcfg = extendedstats.addonDynCfg('extendedevents')
+    dcfg = extendedstats.addonDynCfg('extendedevents',default)
 
 def load():
     if EE:

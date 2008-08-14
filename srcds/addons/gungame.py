@@ -15,7 +15,7 @@ if GGP.isdir(): # check if gungame is present on the server
 # This method will be called when eXtended Stats is loaded
 # It is used to register events used in this addon
 def load():
-    if GGP.isdir(): # check if gungame is present on the server
+    if extendedstats.addonIsLoaded('gungame'): # check if gungame is present on the server
         # the registerEvent function registers an event to a function in this addon
         # The first argument is a string and should be the name of this file without the extension
         # The second argument is a string and shoud be the name of the even to register

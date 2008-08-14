@@ -5,7 +5,6 @@ from extendedstats import extendedstats
 import path, es
 
 packagename = 'default'
-EEP = path.path(es.getAddonPath('extendedevents'))
 
 # This function will be called when your method is imported.
 def load():
@@ -15,9 +14,10 @@ def load():
     # The last parameter is the function which shall be called in your script to calculate the score
     extendedstats.registerMethod(packagename,'kdr',KDR)
     extendedstats.registerMethod(packagename,'kills',PureKills)
+    extendedstats.registerMethod(packagename,'deaths',PureDeaths)
     extendedstats.registerMethod(packagename,'team_kdr',tKDR)
     extendedstats.registerMethod(packagename,'killsperminute',kpm)
-    if EEP.isdir():
+    if extendedstats.addonIsLoaded('extendedevents') and extendedstats.game == 'cstrike':
         extendedstats.registerMethod(packagename,'money',money)
     extendedstats.registerMethod(packagename,'score',score)
     extendedstats.registerMethod(packagename,'damage',damage)
@@ -36,6 +36,9 @@ def KDR(player):
 def PureKills(player):
     # Probably the easiest you can do
     return player['kills']
+
+def PureDeaths(player):
+    return player['deaths']
     
 def kpm(player):
     # time is a float in seconds

@@ -1,12 +1,12 @@
 import time
 from extendedstats import extendedstats as xs
 
-new_dcfg = {
+default = {
     'enabled': '0',
     'limit': '30d',
 }
 
-dcfg = xs.addonDynCfg('auto_prune')
+dcfg = xs.addonDynCfg('auto_prune',default)
 
 def load():
     xs.registerEvent('auto_prune','es_map_start',prune)

@@ -5,7 +5,16 @@ import es, time, popuplib
 scfg = extendedstats.scfg
 
 # This dict will be used to fill new players with default keys->values to prevent key not found errors.
-new_player = {
+dods_player = {
+    'dod_sniper': 0,
+    'dod_rifleman': 0,
+    'dod_assault': 0,
+    'dod_support': 0,
+    'dod_rocket': 0,
+    'dod_mg': 0,
+    'dod_blocks': 0,
+}
+cstrike_player = {
     'bomb_defused': 0,
     'bomb_dropped': 0,
     'bomb_exploded': 0,
@@ -18,6 +27,13 @@ new_player = {
     'hostage_killed': 0,
     'hostage_rescued': 0,
     'hostage_stops_following': 0,
+    'radio': 0,
+    'smokegrenade_detonate': 0,
+    'vip_escaped': 0,
+    'vip_killed': 0,
+    'vip_died': 0,
+}
+new_player = {
     'weapons_picked_up':{},
     'sessions': 0,
     'sessionstart': None,
@@ -37,7 +53,6 @@ new_player = {
     'hurt_damage': 0,
     'attacked_damage': 0,
     'jump': 0,
-    'radio': 0,
     'team_1_time': 0,
     'team_2_time': 0,
     'team_3_time': 0,
@@ -47,17 +62,6 @@ new_player = {
     'lose': 0,
     'rounds': 0,
     'ban': 0,
-    'smokegrenade_detonate': 0,
-    'vip_escaped': 0,
-    'vip_killed': 0,
-    'vip_died': 0,
-    'dod_sniper': 0,
-    'dod_rifleman': 0,
-    'dod_assault': 0,
-    'dod_support': 0,
-    'dod_rocket': 0,
-    'dod_mg': 0,
-    'dod_blocks': 0,
     'lastname': '',
     'names': {},
     'settings':{
@@ -65,6 +69,10 @@ new_player = {
         'name': None,
     },
 }
+if extendedstats.game == 'cstrike':
+    new_player.update(cstrike_player)
+elif extendedstats.game == 'dod':
+    new_player.update(dods_player)
 
 def load():
     extendedstats.registerLiveKey('time',liveTime)
@@ -145,17 +153,18 @@ def cmd_statsme(userid,args):
     if player['settings']['method'] in extendedstats.methods.keys():
         pr = extendedstats.getRank(steamid,player['settings']['method'])
         ps = extendedstats.getScore(steamid,player['settings']['method'])
-    lines = ['Your Stats']
-    lines.append('Rank (default method): %s (%s)' % (dr,ds))
-    if pr:
-        lines.append('Rank (personal method): %s (%s)' % (pr,ps))
-    lines.append('Top rank: %s (%s) using %s' % (top))
-    lines.append('Low rank: %s (%s) using %s' % (low))
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
     statshim.settitle('Your stats:')
-    for x in lines:
-        statshim.additem(x)
+    statshim.additem('Rank (default method): %s (%s)' % (dr,ds))
+    if pr:
+        statshim.additem('Rank (personal method): %s (%s)' % (pr,ps))
+    statshim.additem('Top rank: %s (%s) using %s' % (top))
+    statshim.additem('Low rank: %s (%s) using %s' % (low))
+    if extendedstats.dcfg.as_bool('statsme_methods'):
+        mlist = extendedstats.dcfg['statsme_methods']
+        for method in mlist.split(';' if ';' in mlist else ','):
+            statshim.additem('%s: %s (%s)' % (method,extendedstats.getRank(steamid,method),extendedstats.getScore(steamid,method)))
     statshim.send(userid)
     
 def cmd_methods(userid,args):
@@ -216,13 +225,12 @@ def settingsCallback2(userid,choice,name):
     
 def displayTop(userid,x,method):
     topplayers = extendedstats.getToplist(x,method)
-    displist = []
     pplchck('xs_top_list_%s' % userid)
     toplist = popuplib.easylist('xs_top_list_%s' % userid)
     toplist.settitle('Top %s (%s):' % (x,method))
     i = 1
     for player in topplayers:
-        toplist.additem('%s: %s (%s)' % (i,extendedstats.getName(player[0]),player[1]))
+        toplist.additem('%s: %s (%s)' % (i,extendedstats.getName(player[1]),player[0]))
         i += 1
     toplist.send(userid)
 
