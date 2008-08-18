@@ -14,10 +14,10 @@ def load():
 def prune(ev):
     if dcfg['enabled'] == '1':
         limit = parseLimit(dcfg['limit'])
-        for player in xs.data:
-            if not player == 'info':
-                if time.time() - limit > xs.data[player]['lastseen']:
-                    del xs.data[player]
+        xs.players.execute("SELECT steamid FROM xs_main WHERE lastseen<%s" % limit)
+        steamids = xs.players.fetchall()
+        for table in xs.tables:
+            xs.tables[table].execute("DELETE FROM xs_%s WHERE " % (table,' OR '.join(map(lambda x: "steamid='%s'" % x,steamids))))
         
 def parseLimit(mytime):
     timeformat = mytime[-1]

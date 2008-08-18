@@ -4,18 +4,19 @@ import es, path
 
 scfg = extendedstats.scfg
 
-GGP = path.path(es.getAddonPath('gungame'))
+GG = extendedstats.addonIsLoaded('gungame')
 
-if GGP.isdir(): # check if gungame is present on the server
-    new_player = {
-        'gg_level': 0,
-        'gg_win': 0,
-    }
+if GG: # check if gungame is present on the server
+    columns = [
+        ('gg_level','INTEGER DEFAULT 0'),
+        ('gg_win','INTEGER DEFAULT 0'),
+    ]
+    extendedstats.players.addColumns(columns)
 
 # This method will be called when eXtended Stats is loaded
 # It is used to register events used in this addon
 def load():
-    if extendedstats.addonIsLoaded('gungame'): # check if gungame is present on the server
+    if GG: # check if gungame is present on the server
         # the registerEvent function registers an event to a function in this addon
         # The first argument is a string and should be the name of this file without the extension
         # The second argument is a string and shoud be the name of the even to register
@@ -40,12 +41,12 @@ def load():
 def gungame_level(ev):
     # IMPORTANT: Always check if your user is a bot!!!
     if not es.isbot(ev['userid']):
-        extendedstats.data[ev['steamid']]['gg_level'] += int(ev['old_level']) - int(ev['new_level'])
+        extendedstats.players.add(ev['steamid'],'gg_level',int(ev['old_level']) - int(ev['new_level']))
 
 def gungame_winner(ev):
     # IMPORTANT: Always check if your user is a bot!!!
     if not es.isbot(ev['userid']):
-        extendedstats.data[ev['steamid']]['gg_win'] += 1
+        extendedstats.players.increment(ev['steamid'],'gg_win')
         
 def ggwon_command(userid,arguments):
-        es.tell(userid,'You have won GunGame %s times' % extendedstats.data[es.getplayersteamid(userid)]['gg_win'])
+        es.tell(userid,'You have won GunGame %s times' % extendedstats.players.query(es.getplayersteamid(userid),'gg_win'))

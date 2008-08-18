@@ -16,7 +16,7 @@
 ##############################
 
 import es, playerlib, vecmath, popuplib
-import time, path, cPickle, sys, traceback, psyco, hashlib, base64, urllib
+import time, path, sqlite3, sys, traceback, psyco, hashlib, base64, urllib
 psyco.full()
 
 ##############################
@@ -32,7 +32,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:121'
+info.version        = '0.1.0:122'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -43,21 +43,18 @@ gamepath = path.path(str(es.ServerVar('eventscripts_gamedir')))
 xspath = gamepath.joinpath('addons/eventscripts/extendedstats/')
 methodspath = xspath.joinpath('methods/')
 addonspath = xspath.joinpath('addons/')
-databasepath = xspath.joinpath('data.cpickle')
 
 game = str(es.ServerVar('eventscripts_gamedir')).replace('\\', '/').rpartition('/')[2]
 methods = {}
 addoncommands = {}
 reggedccmd = []
 reggedscmd = []
-ignore_keys = []
-live_keys = {}
-data = {}
 errorhashes = []
 newconnected = []
-new_player = {}
+tables = {}
 cmdhelp = {}
 uniquecommands = []
+loadedAddonsList = map(lambda x: str(x),es.addons.getAddonList())
 
 ##############################
 ###     DEBUG HELPER      ####
@@ -102,10 +99,8 @@ def dbg(text):
 def load():
     dbg( '')
     dbg( 'XS: Loading...')
-    loadDatabase()
     loadPackages()
     loadAddons()
-    checkUpgrade()
     fillDatabase()
     es.regsaycmd(scfg.say_command_prefix + scfg.command_help,'extendedstats/cmd_help')
     es.regclientcmd(scfg.command_help,'extendedstats/cmd_help')
@@ -113,17 +108,17 @@ def load():
     loadMenus()
     es.regcmd('xs_clean','extendedstats/clean')
     es.regcmd('xs_resetlog','extendedstats/resetlog')
+    es.regcmd('xs_convert','extendedstats/convert')
     dbg( 'XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
-    dbg( 'XS: Standard new_player (%s keys):' % len(new_player))
-    for key in new_player:
-        dbg( '    %s: %s' % (key,new_player[key]))
     dcfg.sync()
     dbg( 'XS: Loaded successfully (%s: %s)' % (info.versionname,info.version))
     dbg( '')
     
 def clean():
+    return
+    # for reference:
     tbd = []
     for player in data:
         if not player:
@@ -144,41 +139,39 @@ def clean():
             
 def resetlog():
     errorlog.write_text('')
+    
+def convert():
+    dbpath = xspath.joinpath('data.cpickle')
+    if not dbpath.isfile():
+        return
+    backuppath = xspath.joinpath('backup')
+    if not backuppath.isdir():
+        backuppath.mkdir()
+    import cPickle
+    olddb = cPickle.load(dbpath.open('rb'))
+    dbpath.move(backuppath)
+    for steamid in olddb:
+        if not steamid == 'info':
+            if not steamid in players:
+                players.newplayer(steamid)
+            for key in filter(lambda x: x in map(lambda x: x[0],columns),olddb[steamid].keys()):
+                players.update(steamid,key,olddb[key])
+    
 
 def unload():
     es.unregsaycmd('!help')
     for addon in addonsunloaders:
         addon()
-    saveDatabase()
     unloadCommands()
-    
-def loadDatabase():
-    global data
-    if databasepath.isfile():
-        dbg( 'XS: Loading database')
-        dbf = databasepath.open('rb')
-        data = cPickle.load(dbf)
-        dbf.close()
-        
-def saveDatabase():
-    dbg( 'XS: Saving database')
-    dbf = databasepath.open('wb')
-    cPickle.dump(data,dbf)
-    dbf.close()
         
 def loadAddons():
-    global new_player, addonsunloaders
+    global addonsunloaders
     addonsunloaders = []
     if scfg.allAddons:
         for addon in addonspath.files():
             if addon.endswith('.py') and not addon.namebase == '__init__':
                 name = addon.namebase
-                addonmodule = __import__('extendedstats.addons.%s'%name, fromlist=['addons', name])
-                if hasattr(addonmodule,'new_player'):
-                    new_player.update(addonmodule.new_player)
-                    dbg( 'XS: new_player scheme added for %s' % name)
-                else:
-                    dbg( 'XS: no new_player scheme in %s' % name)             
+                addonmodule = __import__('extendedstats.addons.%s'%name, fromlist=['addons', name])         
                 if callable(getattr(addonmodule, 'load', None)):
                     addonmodule.load()
                 else:
@@ -192,17 +185,7 @@ def loadAddons():
         for name in scfg.addonList:
             af = addonspath.joinpath('%s.py' % name)
             if af.isfile():
-                addonmodule = __import__('extendedstats.addons.%s' % name, fromlist=['addons', name])
-                if hasattr(addonmodule,'new_player'):
-                    new_player.update(addonmodule.new_player)
-                    dbg( 'XS: new_player scheme added for %s' % name)
-                else:
-                    dbg( 'XS: no new_player scheme in %s' % name)
-                if hasattr(addonmodule,'new_dcfg'):
-                    new_dcfg[name] = addonmodule.newplayer
-                    dbg( 'XS: new_dcfg scheme added for %s' % name)
-                else:
-                    dbg( 'XS: no new_dcfg scheme in %s' % name)             
+                addonmodule = __import__('extendedstats.addons.%s' % name, fromlist=['addons', name])     
                 if callable(getattr(addonmodule, 'load', None)):
                     addonmodule.load()
                 else:
@@ -212,31 +195,16 @@ def loadAddons():
                     addonsunloaders.append(addonunloader)
                 else:
                     dbg( 'XS: no unloader in %s' % name)
-    
-def checkUpgrade():
-    global data
-    if data != {}:
-        for key in new_player:
-            for player in data:
-                if not player == 'info' and key not in data[player]:
-                    if type(new_player[key]) == dict:
-                        data[player][key] = new_player[key].copy()
-                    else:
-                        data[player][key] = new_player[key]
-    if 'info' not in data:
-        data['info'] = {}
-    data['info']['new_player'] = new_player
-    data['info']['db_version'] = info.version
 
 def loadPackages():
-    if scfg.allMethods:
-        for method in methodspath.files():
-            if method.endswith('.py') and not method.namebase == '__init__':
-                name = method.namebase
+    if scfg.allPackages:
+        for package in methodspath.files():
+            if package.endswith('.py') and not package.namebase == '__init__':
+                name = package.namebase
                 packageloader = __import__('extendedstats.methods.%s' % name, fromlist=['methods', name]).load
                 packageloader()
     else:
-        for name in scfg.methodList:
+        for name in scfg.packageList:
             mf = methodspath.joinpath('%s.py' % name)
             if mf.isfile():
                 packageloader = __import__('extendedstats.methods.%s' % name, fromlist=['methods', name]).load
@@ -245,12 +213,12 @@ def loadPackages():
 def fillDatabase():
     for player in playerlib.getPlayerList('#human'):
         steamid = sid(int(player))
-        if steamid not in data:
-            data[steamid] = new_player.copy()
-        data[steamid]['sessionstart'] = player.attributes['timeconnected']
-        data[steamid]['lastseen'] = time.time()
-        data[steamid]['lastname'] = player.attributes['name']
-        data[steamid]['teamchange_time'] = data[steamid]['sessionstart']
+        if steamid not in players:
+            players.newplayer(steamid)
+        players.update(steamid,'sessionstart',player.attributes['timeconnected'])
+        players.update(steamid,'lastseen',time.time())
+        players.name(steamid,player.attributes['name'])
+        players.update(steamid,'teamchange_time',player.attributes['timeconnected'])
 
 def unloadCommands():
     for saycmd in reggedscmd:
@@ -287,8 +255,9 @@ def loadMenus():
         
 def registerMethod(package,name,method): # string,string,method
     global methods
-    methods[name.lower()] = method
-    dbg( 'XS: Registered method %s for %s' % (name,package))
+    if scfg.allMethods or name.lower() in scfg.methodList:
+        methods[name.lower()] = method
+        dbg( 'XS: Registered method %s for %s' % (name,package))
     
 def registerEvent(name,event,callback): # string,string,method
     es.addons.registerForEvent(__import__('extendedstats.addons.%s' % name), event, callback)
@@ -312,15 +281,6 @@ def registerCommand(command,addonname,callback,clientcommand=True,saycommand=Tru
         reggedscmd.append(command)
         dbg( 'XS: Registered saycommand %s for %s' % (command,addonname))
         
-def registerLiveKey(name,callback):
-    global live_keys, ignore_keys
-    ignore_keys.append(name)
-    live_keys[name] = callback
-
-def registerIgnoreKey(name):
-    global ignore_keys
-    ignore_keys.append(name)
-        
 def addHelp(command,helptext):
     global cmdhelp
     if not type(helptext) == list:
@@ -328,45 +288,44 @@ def addHelp(command,helptext):
     cmdhelp[command] = helptext
     dbg( 'XS: Added help text for %s' % command)
     
-def getScore(player,method):
+def getScore(steamid,method):
     if method not in methods:
         method = dcfg['default_method']
-    return methods[method](getPlayer(player))
+    return methods[method](players,steamid)
 
-def getRank(player,method):
+def getRank(steamid,method):
     method = getMethod(method)
+    if method in players.columns:
+        players.execute("SELECT steamid FROM xs_main ORDER BY %s DESC" % (method))
+        allplayers = players.fetchall()
+        return allplayers.index(steamid) + 1,len(allplayers)
     x = 1
-    score = getScore(player,method)
-    for user in data:
-        if not user in [player,'info']:
-            userscore = getScore(user,method)
-            if userscore > score:
-                x += 1
-    return x
+    score = getScore(steamid,method)
+    allplayers = players.getPlayerList()
+    for steamid in allplayers:
+        if (steamid,method) > score:
+            x += 1
+    return x, len(allplayers)
 
 def getToplist(x,method=None):
     method = getMethod(method)
     tlist = []
-    for player in data:
-        if not player == 'info':
-            tlist.append((getScore(player,method),player))
-    tlist.sort(reverse=True)
+    if method in players.columns:
+        players.execute("SELECT steamid,%s FROM xs_main ORDER BY %s DESC%s" % (method,method," LIMIT %s" % args[2] if args[2] else ""))
+        for row in players.fetchall():
+            steamid,score = row
+            tlist.append(score,steamid)
+    else:
+        for steamid in players.getPlayerList():
+            tlist.append((getScore(steamid,method),steamid))
+        tlist.sort(reverse=True)
     return tlist
 
-def getPlayer(player):
-    live = {}
-    for key in data[player]:
-        if not key in ignore_keys:
-            live[key] = data[player][key]
-        if key in live_keys:
-            live[key] = live_keys[key](player)
-    return live
-
-def getName(player):
-    if data[player]['settings']['name']:
-        return data[player]['settings']['name']
-    else:
-        return data[player]['lastname']
+def getName(steamid):
+    settings_name = players.query(steamid,'settings_name')
+    if settings_name:
+        return settings_name
+    return players.query(steamid,'name1')
 
 ### Helpers ###
             
@@ -398,7 +357,19 @@ def getMethod(method=None):
     return methods[keys[0]]
 
 def addonIsLoaded(addonname):
-    return bool(filter(lambda x: 'extendedevents' in str(x),es.addons.getAddonList()))
+    return addonname in loadedAddonsList
+
+def updateTimes():
+    for userid in playerlib.getUseridList('#human'):
+        steamid = es.getplayersteamid(userid)
+        players.update(steamid,'lastseen',time.time())
+        players.add(steamid,'time',time.time() - players.query(steamid,'sessionstart'))
+        players.update(steamid,'sessionstart',time.time())
+        cteam = players.query(steamid,'current_team')
+        if not cteam == '0':
+            players.add(steamid,'team_%s_time' % cteam,time.time() - players.query(steamid,'teamchange_time'))
+        players.update(steamid,'teamchange_time',time.time())
+        
     
 ##############################
 ###   INGAME INTERACTION   ###
@@ -436,114 +407,101 @@ def player_connect(ev):
     newconnected.append(ev['userid'])
 
 def player_spawn(ev):
-    global data, newconnected
+    global newconnected
     print 'player_spawn'
     if not es.isbot(ev['userid']):
         steamid = es.getplayersteamid(ev['userid'])
         if not steamid:
             print 'NO STEAM ID!!!'
             return
-        if steamid in data:
-            if not ev['userid'] in newconnected:
-                return
-            data[steamid]['sessions'] += 1
-            data[steamid]['sessionstart'] = time.time()
-            data[steamid]['lastseen'] = time.time()
-            data[steamid]['teamchange_time'] = time.time()
-            data[steamid]['changename'] += 1
-            newname = es.getplayername(ev['userid'])
-            if newname in data[steamid]['names']:
-                data[steamid]['names'][newname] += 1
-            else:
-                data[steamid]['names'][newname] = 1
-            data[steamid]['lastname'] = newname
-            newconnected.remove(ev['userid'])
-            dbg('player spawned (activate): %s' % steamid)
+        if not ev['userid'] in newconnected:
             return
-        data[steamid] = new_player.copy()
-        data[steamid]['sessions'] += 1
-        data[steamid]['sessionstart'] = time.time()
-        data[steamid]['lastseen'] = time.time()
-        data[steamid]['teamchange_time'] = time.time()
-        data[steamid]['changename'] += 1
+        if not steamid in players:
+            players.newplayer(steamid)
+        players.increment(steamid,'sessions')
+        players.update(steamid,'sessionstart',time.time())
+        players.update(steamid,'lastseen',time.time())
+        players.update(steamid,'teamchange_time',time.time())
         newname = es.getplayername(ev['userid'])
-        data[steamid]['names'][newname] = 1
-        data[steamid]['lastname'] = newname
+        players.name(steamid,newname)
         newconnected.remove(ev['userid'])
-        dbg('new player spawned: %s' % steamid)
+        dbg('player spawned: %s' % steamid)
 
 def player_disconnect(ev):
-    global data
+    global newconnected
+    if ev['userid'] in newconnected:
+        newconnected.remove(ev['userid'])
+        return
     if not es.isbot(ev['userid']):
         dbg( 'player disconnected: %s' % ev['userid'])
-        if not es.isbot(ev['userid']):
-            dbg( 'finnishing player session')
-            steamid = ev['networkid']
-            if steamid in data:
-                data[steamid]['lastseen'] = time.time()
-                data[steamid]['time'] += time.time() - data[steamid]['sessionstart']
-                if not data[steamid]['current_team'] == '0':
-                    data[steamid]['team_%s_time' % data[steamid]['current_team']] += time.time() - data[steamid]['teamchange_time']
-                    data[steamid]['teamchange_time'] = time.time()
-                data[steamid]['current_team'] = '0'
+        dbg( 'finnishing player session')
+        steamid = ev['networkid']
+        if not steamid in players:
+            return
+        players.update(steamid,'lastseen',time.time())
+        players.add(steamid,'time',time.time() - players.query(steamid,'sessionstart'))
+        cteam = players.query(steamid,'current_team')
+        if not cteam == '0':
+            players.add(steamid,'team_%s_time' % cteam,time.time() - players.query(steamid,'teamchange_time'))
+        players.update(steamid,'teamchange_time',time.time())
+        players.update(steamid,'current_team',0)
     
 def bomb_defused(ev):
     if not es.isbot(ev['userid']):
         dbg( 'bomb defused')
-        data[sid(ev)]['bomb_defused'] += 1
+        players.increment(sid(ev),'bomb_defused')
 
 def bomb_dropped(ev):
     if not es.isbot(ev['userid']):
         dbg( 'bomb dropped')
         steamid = sid(ev)
         if steamid:
-            data[steamid]['bomb_dropped'] += 1
+            players.increment(sid(ev),'bomb_dropped')
 
 def bomb_exploded(ev):
     if not es.isbot(ev['userid']):
         dbg( 'bomb exploded')
-        data[sid(ev)]['bomb_exploded'] += 1
+        players.increment(sid(ev),'bomb_exploded')
 
 def bomb_pickup(ev):
     if not es.isbot(ev['userid']):
         dbg( 'bomb pickup')
-        data[sid(ev)]['bomb_pickup'] += 1
+        players.increment(sid(ev),'bomb_pickup')
 
 def flashbang_detonate(ev):
     if not es.isbot(ev['userid']):
         dbg( 'flashbang detonate')
-        data[sid(ev)]['flashbang_detonate'] += 1
+        players.increment(sid(ev),'flashbang_detonate')
 
 def hegrenade_detonate(ev):
     if not es.isbot(ev['userid']):
         dbg( 'hegrenade detonate')
-        data[sid(ev)]['hegrenade_detonate'] += 1
+        players.increment(sid(ev),'hegrenade_detonate')
 
 def hostage_follows(ev):
     if not es.isbot(ev['userid']):
         dbg( 'hostage follows')
-        data[sid(ev)]['hostage_follows'] += 1
+        players.increment(sid(ev),'hostage_follows')
 
 def hostage_hurt(ev):
     if not es.isbot(ev['userid']):
         dbg( 'hostage hurt')
-        data[sid(ev)]['hostage_hurt'] += 1
-        # data[sid(ev)]['hostage_hurt_damage'] += ???
+        players.increment(sid(ev),'hostage_hurt')
 
 def hostage_killed(ev):
     if not es.isbot(ev['userid']):
         dbg( 'hostage killed')
-        data[sid(ev)]['hostage_killed'] += 1
+        players.increment(sid(ev),'hostage_killed')
 
 def hostage_rescued(ev):
     if not es.isbot(ev['userid']):
         dbg( 'hostage rescued')
-        data[sid(ev)]['hostages_rescued'] += 1
+        players.increment(sid(ev),'hostage_rescued')
 
 def hostage_stops_following(ev):
     if not es.isbot(ev['userid']):
         dbg( 'hostage stops following')
-        data[sid(ev)]['hostage_stops_following'] += 1
+        players.increment(sid(ev),'hostage_stops_following')
     
 def item_pickup(ev):
     if not es.isbot(ev['userid']):
@@ -553,22 +511,14 @@ def item_pickup(ev):
         if item.startswith('weapon'):
             dbg( 'weapon picked up: %s' % item)
             weapon = item[7:]
-            if weapon in data[steamid]['weapons_picked_up']:
-                data[steamid]['weapons_picked_up'][weapon] += 1
-            else:
-                data[steamid]['weapons_picked_up'][weapon] = 1
+            weapons.increment(steamid,'pickup_%s' % weapon)
 
 def player_changename(ev):
     if not es.isbot(ev['userid']):
         dbg( 'player changed name')
         steamid = sid(ev)
-        data[steamid]['changename'] += 1
         newname = ev['newname']
-        if newname in data[steamid]['names']:
-            data[steamid]['names'][newname] += 1
-        else:
-            data[steamid]['names'][newname] = 1
-        data[steamid]['lastname'] = newname
+        players.name(steamid,newname)
 
 def player_death(ev):
     dbg('')
@@ -590,43 +540,28 @@ def player_death(ev):
     if wasTeamKill:
         dbg( 'teamkill')
         if not victimIsBot:
-            data[victimSteamid]['teamkilled'] += 1
+            players.increment(victimSteamid,'teamkilled')
         if not attackerIsBot:
-            data[attackerSteamid]['teamkills'] += 1
+            players.increment(attackerSteamid,'teamkills')
     else:
         dbg( 'kill')
         if not victimIsBot:
-            data[victimSteamid]['deaths'] += 1
-            dbg('increased deaths of %s by one to %s' % (victimSteamid,data[victimSteamid]['deaths']))
+            players.increment(victimSteamid,'deaths')
         if not attackerIsBot:
-            data[attackerSteamid]['kills'] += 1
-            dbg('increased kills of %s by one to %s' % (attackerSteamid,data[attackerSteamid]['kills']))
+            players.increment(attackerSteamid,'kills')
     if not victimIsBot:
         dbg( 'weapon stats (death)')
-        if weapon in data[victimSteamid]['death_weapons']:
-            data[victimSteamid]['death_weapons'][weapon] += 1
-        else:
-            data[victimSteamid]['death_weapons'][weapon] = 1
+        weapons.increment(victimSteamid,'death_%s' % weapon)
     if not attackerIsBot:
         dbg( 'weapon stats (kill)')
-        if weapon in data[attackerSteamid]['kill_weapons']:
-            data[attackerSteamid]['kill_weapons'][weapon] += 1
-        else:
-            data[attackerSteamid]['kill_weapons'][weapon] = 1
+        weapons.increment(attackerSteamid,'kill_%s' % weapon)
         if isHeadshot:
-            data[attackerSteamid]['headshots'] += 1
-    dbg('')
-    dbg('all kills/deaths of all regged players:')
-    dbg('kills:    deaths:')
-    for player in data:
-        if not player == 'info':
-            dbg('    %s    %s' % (data[player]['kills'],data[player]['deaths']))
-    dbg('')
+            players.increment(attackerSteamid,'headshots')
     
 def player_falldamage(ev):
     if not es.isbot(ev['userid']):
         dbg( 'falldamage')
-        data[sid(ev)]['falldamage'] += float(ev['damage'])
+        players.add(sid(ev),'falldamage',float(ev['damage']))
 
 def player_hurt(ev):
     victim = ev['es_steamid']
@@ -637,24 +572,26 @@ def player_hurt(ev):
         damage = int(ev['damage'])
     if not es.isbot(ev['userid']):
         dbg( 'player hurt')
-        data[victim]['hurt'] += 1
+        players.increment(victim,'hurt')
+        players.add(victim,'hurt_damage',damage)
         data[victim]['hurt_damage'] += damage
     if not es.isbot(ev['attacker']) and bool(int(ev['attacker'])):
         dbg( 'player hurted')
-        data[attacker]['attacked'] += 1
-        data[attacker]['attacked_damage'] += damage
+        players.increment(attacker,'attacked')
+        players.add(attacker,'attacked_damage',damage)
 
 def player_jump(ev):
     if not es.isbot(ev['userid']):
         dbg( 'player jumped')
         steamid = sid(ev)
-        data[steamid]['jump'] += 1
-        data[steamid]['jump_startpos'] = vecmath.vector(es.getplayerlocation(ev['userid']))
+        players.increment(steamid,'jump')
+        vStartpos = vecmath.vector(es.getplayerlocation(ev['userid']))
+        players.update(steamid,'jump_startpos',str(vStartpos))
 
 def player_radio(ev):
     if not es.isbot(ev['userid']):
         dbg( 'player radiomsg')
-        data[sid(ev)]['radio'] += 1
+        players.increment(sid(ev),'radio')
 
 def player_team(ev):
     if not es.isbot(ev['userid']):
@@ -665,17 +602,17 @@ def player_team(ev):
             nt = ev['team']
             if ot in ['1','0'] and nt in ['2','3']:
                 dbg( 'spec to play')
-                data[steamid]['team_1_time'] += time.time() - data[steamid]['teamchange_time']
-                data[steamid]['teamchange_time'] = time.time()
+                players.add(steamid,'team_1_time',time.time() - players.query(steamid,'teamchange_time'))
+                players.update(steamid,'teamchange_time',time.time())
             if ot in ['2','3'] and nt in ['1','0']:
                 dbg( 'play to spec')
                 data[steamid]['team_%s_time' % ot] += time.time() - data[steamid]['teamchange_time']
                 data[steamid]['teamchange_time'] = time.time()
             if ot in ['2','3'] and ot != nt:
                 dbg( 'teamswitch')
-                data[steamid]['team_%s_time' % ot] += time.time() - data[steamid]['teamchange_time']
-                data[steamid]['teamchange_time'] = time.time()
-            data[steamid]['current_team'] = nt
+                players.add(steamid,'team_%s_time' % ot,time.time() - players.query(steamid,'teamchange_time'))
+                players.update(steamid,'teamchange_time',time.time())
+            players.update(steamid,'current_team',nt)
         else:
             dbg( 'disconnected')
 
@@ -685,35 +622,35 @@ def round_end(ev):
     if ev['winner'] == '2':
         wt,lt = lt,wt
     for userid in playerlib.getUseridList('#human,#%s' % wt):
-        data[es.getplayersteamid(userid)]['win'] += 1
+        players.increment(es.getplayersteamid(userid),'win')
     for userid in playerlib.getUseridList('#human,#%s' % lt):
-        data[es.getplayersteamid(userid)]['lose'] += 1
-    saveDatabase()
+        players.increment(es.getplayersteamid(userid),'lose')
     dcfg.sync()
+    updateTimes()
 
 def server_addban(ev):
     if not es.isbot(ev['userid']):
         dbg( 'addban')
-        if ev['networkid'] in data:
-            data[ev['networkid']]['ban'] += 1
+        if ev['networkid'] in players:
+            players.increment(ev['networkid'],'ban')
 
 def smokegrenade_detonate(ev):
     if not es.isbot(ev['userid']):
         dbg( 'smokegrenade detonate')
-        data[sid(ev)]['smokegrenade_detonate'] += 1
+        players.increment(sid(ev),'smokegrenade_detonate')
         
 def vip_escaped(ev):
     if not es.isbot(ev['userid']):
         dbg( 'vip escaped')
-        data[sid(ev)]['vip_escaped'] += 1
+        players.increment(sid(ev),'vip_escaped')
 
 def vip_killed(ev):
     if not es.isbot(ev['attacker']):
         dbg( 'vip killed')
-        data[es.getplayersteamid(ev['attacker'])]['vip_killed'] += 1
+        players.increment(ev['attacker'],'vip_killed')
     if not es.isbot(ev['userid']):
         dbg( 'vip died')
-        data[sid(ev)]['vip_died'] += 1
+        players.increment(sid(ev),'vip_died')
 
 def player_changeclass(ev):
     dbg( 'player changed class')
@@ -723,7 +660,7 @@ def player_changeclass(ev):
 def dod_capture_blocked(ev):
     if not es.isbot(ev['userid']):
         dbg( 'capture blocked')
-        data[sid(ev)]['dod_blocks'] += 1
+        players.increment(sid(ev),'dod_blocks')
 
 def dod_round_win(ev):
     wt,lt = 'ct','t'
@@ -731,21 +668,21 @@ def dod_round_win(ev):
     if ev['team'] == '2':
         wt,lt = lt,wt
     for userid in playerlib.getUseridList('#human,#%s' % wt):
-        data[es.getplayersteamid(userid)]['win'] += 1
+        players.increment(es.getplayersteamid(userid),'win')
     for userid in playerlib.getUseridList('#human,#%s' % lt):
-        data[es.getplayersteamid(userid)]['lose'] += 1
-    saveDatabase()
+        players.increment(es.getplayersteamid(userid),'lose')
     dcfg.sync()
+    updateTimes()
 
 def dod_bomb_exploded(ev):
     if not es.isbot(ev['userid']):
         dbg( 'bomb exploded')
-        data[sid(ev)]['bomb_exploded'] += 1
+        players.increment(sid(ev),'bomb_exploded')
 
 def dod_bomb_defused(ev):
     if not es.isbot(ev['userid']):
         dbg( 'bomb defused')
-        data[sid(ev)]['bomb_defused'] += 1
+        players.increment(sid(ev),'bomb_defused')
     
 def es_map_start(ev):
     dcfg.sync()
@@ -862,3 +799,198 @@ default = {
     'statsme_methods': '',
 }
 dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)
+
+class Sqlite(object):
+    def __init__(self,table,columns=[('steamid','TEXT PRIMARY KEY')]):
+        self.con = sqlite3.connect(xspath.joinpath('database.sqlite'))
+        self.cur = self.con.cursor()
+        self.table = table
+        self.create(columns)
+        self.columns = self.getColumns()
+        self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
+        
+    def create(self,columns):
+        if self.tableExists():
+            existingColumns = self.getColumns()
+            columns = filter(lambda x: x[0] not in existingColumns,columns)
+            self.addColumns(columns)
+        else:
+            coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
+            self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),True)
+        
+    def tableExists(self):
+        return len(self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall()) > 0
+        
+    def getColumns(self):
+        return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall())
+    
+    def getPlayerList(self):
+        self.execute("SELECT steamid FROM xs_%s" % self.table)
+        return self.fetchall()
+    
+    def numericColumn(self,key):
+        self.execute('PRAGMA table_info(xs_%s)' % self.table)
+        all = self.fetchall()
+        column = filter(lambda x: x[1] == key,all)[0]
+        return column[2] in ('INTEGER','REAL')
+        
+    def addColumns(self,columns):
+        for column in columns:
+            self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),True)
+        self.columns = self.getColumns()
+        self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
+        
+    def execute(self,sql,save=False):
+        self.cur.execute(sql)
+        if save:
+            self.con.commit()
+            
+    def fetchall(self):
+        trueValues = []
+        for value in self.cur.fetchall():
+            if len(value) > 1:
+                trueValues.append(value)
+            else:
+                trueValues.append(value[0])
+        return trueValues
+       
+    def fetchone(self):
+        one = self.cur.fetchone()
+        if one:
+            one = one[0]
+        return one
+    
+    def __contains__(self,steamid):
+        self.execute("SELECT kills FROM xs_%s WHERE steamid='%s'" % (self.table,steamid))
+        return bool(self.cur.fetchone()) 
+    
+    def query(self,steamid,key):
+        self.execute("SELECT %s FROM xs_%s WHERE steamid='%s'" % (key,self.table,steamid))
+        return self.fetchone()
+        
+    def convert(self,key,value):
+        if key in self.numericColumns:
+            return value
+        return "'%s'" % value
+        
+    def update(self,steamid,key,newvalue):
+        self.execute("UPDATE xs_%s SET %s=%s WHERE steamid='%s'" % (self.table,key,self.convert(key,newvalue),steamid),True)
+        
+    def increment(self,steamid,key):
+        old = self.query(steamid,key)
+        if not old:
+            old = 0
+        self.execute("UPDATE xs_%s SET %s=%s WHERE steamid='%s'" % (self.table,key,old + 1,steamid),True)
+        
+    def add(self,steamid,key,amount):
+        current = self.query(steamid,key)
+        newamount = current + amount
+        self.execute("UPDATE xs_%s SET %s=%s WHERE steamid='%s'" % (self.table,key,newamount,steamid),True)
+        
+    def name(self,steamid,newname):
+        self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE steamid='%s'" % (self.table,steamid))
+        cnames = self.fetchone()
+        if not cnames:
+            self.update(steamid,'name1',newname)
+        else:
+            if not type(cnames) == tuple:
+                cnames = [cnames]
+            if newname in cnames:
+                nnames = [newname]
+                for cname in cnames:
+                    if cname == newname:
+                        continue
+                    nnames.append(cname)
+                    if len(nnames) == 5:
+                        break
+            else:
+                nnames = [newname]
+                for cname in cnames:
+                    nnames.append(cname)
+                    if len(nnames) == 5:
+                        break
+            for x in range(len(nnames)):
+                self.update(steamid,'name%s' % (x + 1),nnames[x])
+        self.increment(steamid,'changename') 
+
+    def newplayer(self,steamid):
+        self.execute("INSERT INTO xs_%s (steamid) VALUES ('%s')" % (self.table,steamid),True)
+        
+dod_columns = [
+    ('dod_sniper', 'INTEGER DEFAULT 0'),
+    ('dod_rifleman', 'INTEGER DEFAULT 0'),
+    ('dod_assault', 'INTEGER DEFAULT 0'),
+    ('dod_support', 'INTEGER DEFAULT 0'),
+    ('dod_rocket', 'INTEGER DEFAULT 0'),
+    ('dod_mg', 'INTEGER DEFAULT 0'),
+    ('dod_blocks', 'INTEGER DEFAULT 0'),
+]
+cstrike_columns = [
+    ('bomb_defused', 'INTEGER DEFAULT 0'),
+    ('bomb_dropped', 'INTEGER DEFAULT 0'),
+    ('bomb_exploded', 'INTEGER DEFAULT 0'),
+    ('bomb_pickup', 'INTEGER DEFAULT 0'),
+    ('flashbang_detonate', 'INTEGER DEFAULT 0'),
+    ('hegrenade_detonate', 'INTEGER DEFAULT 0'),
+    ('hostage_follows', 'INTEGER DEFAULT 0'),
+    ('hostage_hurt', 'INTEGER DEFAULT 0'),
+    ('hostage_killed', 'INTEGER DEFAULT 0'),
+    ('hostage_rescued', 'INTEGER DEFAULT 0'),
+    ('hostage_stops_following', 'INTEGER DEFAULT 0'),
+    ('radio', 'INTEGER DEFAULT 0'),
+    ('smokegrenade_detonate', 'INTEGER DEFAULT 0'),
+    ('vip_escaped', 'INTEGER DEFAULT 0'),
+    ('vip_killed', 'INTEGER DEFAULT 0'),
+    ('vip_died', 'INTEGER DEFAULT 0'),
+]
+columns = [
+    ('steamid','TEXT PRIMARY KEY'),
+    ('sessions', 'INTEGER DEFAULT 0'),
+    ('sessionstart', 'REAL DEFAULT NULL'),
+    ('time', 'REAL DEFAULT 0.0'),
+    ('changename', 'INTEGER DEFAULT 0'),
+    ('kills', 'INTEGER DEFAULT 0'),
+    ('deaths', 'INTEGER DEFAULT 0'),
+    ('teamkills', 'INTEGER DEFAULT 0'),
+    ('teamkilled', 'INTEGER DEFAULT 0'),
+    ('headshots', 'INTEGER DEFAULT 0'),
+    ('lastseen', 'REAL DEFAULT 0.0'),
+    ('falldamage', 'REAL DEFAULT 0.0'),
+    ('attacked', 'INTEGER DEFAULT 0'),
+    ('hurt_damage', 'REAL DEFAULT 0.0'),
+    ('attacked_damage', 'REAL DEFAULT 0.0'),
+    ('jump', 'INTEGER DEFAULT 0'),
+    ('jump_startpos','TEXT DEFAULT NULL'),
+    ('team_1_time', 'REAL DEFAULT 0.0'),
+    ('team_2_time', 'REAL DEFAULT 0.0'),
+    ('team_3_time', 'REAL DEFAULT 0.0'),
+    ('teamchange_time', 'REAL DEFAULT NULL'),
+    ('current_team', 'REAL DEFAULT 0.0'),
+    ('win', 'REAL DEFAULT 0.0'),
+    ('lose', 'REAL DEFAULT 0.0'),
+    ('rounds', 'REAL DEFAULT 0.0'),
+    ('ban', 'REAL DEFAULT 0.0'),
+    ('name1', 'TEXT DEFAULT NULL'),
+    ('name2', 'TEXT DEFAULT NULL'),
+    ('name3', 'TEXT DEFAULT NULL'),
+    ('name4', 'TEXT DEFAULT NULL'),
+    ('name5', 'TEXT DEFAULT NULL'),
+    ('settings_name','TEXT DEFAULT NULL'),
+    ('settings_method','TEXT DEFAULT NULL'),
+]
+if game == 'cstrike':
+    columns += cstrike_columns
+elif game == 'dod':
+    columns += dod_columns
+players = Sqlite('main',columns)
+tables['main'] = players
+weapons = None
+dod_weapons = ['30cal', '30calpr', '30calsr', 'amerknife', 'bar', 'bazooka', 'bazookarocket', 'basebomb', 'c96', 'colt', 'frag', 'garand', 'garandgren', 'garandrggrenade', 'k98', 'k98rg', 'k98rggrenade', 'k98s', 'm1carb', 'mg42', 'mg42bd', 'mg42bu', 'mg42pr', 'mg42sr', 'mp40', 'mp44', 'p38', 'panzerschreckrocket', 'pschreck', 'smokeger', 'smokeus', 'spade', 'spring', 'stick', 'thompson']
+cstrike_weapons = ['glock', 'usp', 'p228', 'deagle', 'fiveseven', 'elite', 'm3', 'xm1014', 'tmp', 'mac10', 'mp5navy', 'ump45', 'p90', 'famas', 'galil', 'ak47', 'scout', 'm4a1', 'sg550', 'g3sg1', 'awp', 'sg552', 'aug', 'm249', 'hegrenade', 'flashbang', 'smokegrenade', 'knife', 'c4']
+if game == 'cstrike':
+    weapons = map(lambda x: ('pickup_%s' % x,'INTEGER DEFAULT 0'),cstrike_weapons)
+elif game == 'dod':
+    weapons = map(lambda x: ('pickup_%s' % x,'INTEGER DEFAULT 0'),dod_weapons)
+if weapons:
+    weapons = Sqlite('weapons',weapons)
+    tables['weapons'] = weapons

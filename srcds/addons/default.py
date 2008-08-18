@@ -5,83 +5,8 @@ import es, time, popuplib
 scfg = extendedstats.scfg
 
 # This dict will be used to fill new players with default keys->values to prevent key not found errors.
-dods_player = {
-    'dod_sniper': 0,
-    'dod_rifleman': 0,
-    'dod_assault': 0,
-    'dod_support': 0,
-    'dod_rocket': 0,
-    'dod_mg': 0,
-    'dod_blocks': 0,
-}
-cstrike_player = {
-    'bomb_defused': 0,
-    'bomb_dropped': 0,
-    'bomb_exploded': 0,
-    'bomb_pickup': 0,
-    'flashbang_detonate': 0,
-    'hegrenade_detonate': 0,
-    'hostage_follows': 0,
-    'hostage_hurt': 0,
-    # 'hostage_hurt_damage': 0, moved to EE4?
-    'hostage_killed': 0,
-    'hostage_rescued': 0,
-    'hostage_stops_following': 0,
-    'radio': 0,
-    'smokegrenade_detonate': 0,
-    'vip_escaped': 0,
-    'vip_killed': 0,
-    'vip_died': 0,
-}
-new_player = {
-    'weapons_picked_up':{},
-    'sessions': 0,
-    'sessionstart': None,
-    'time': 0,
-    'changename': 0,
-    'kills': 0,
-    'kill_weapons': {},
-    'deaths': 0,
-    'death_weapons': {},
-    'teamkills': 0,
-    'teamkilled': 0,
-    'headshots': 0,
-    'lastseen': 0,
-    'falldamage': 0.0,
-    'hurt': 0,
-    'attacked': 0,
-    'hurt_damage': 0,
-    'attacked_damage': 0,
-    'jump': 0,
-    'team_1_time': 0,
-    'team_2_time': 0,
-    'team_3_time': 0,
-    'teamchange_time': None,
-    'current_team': '0',
-    'win': 0,
-    'lose': 0,
-    'rounds': 0,
-    'ban': 0,
-    'lastname': '',
-    'names': {},
-    'settings':{
-        'method': None,
-        'name': None,
-    },
-}
-if extendedstats.game == 'cstrike':
-    new_player.update(cstrike_player)
-elif extendedstats.game == 'dod':
-    new_player.update(dods_player)
 
 def load():
-    extendedstats.registerLiveKey('time',liveTime)
-    extendedstats.registerIgnoreKey('sessionstart')
-    extendedstats.registerIgnoreKey('teamchange_time')
-    extendedstats.registerIgnoreKey('current_team')
-    extendedstats.registerLiveKey('team_2_time',liveTeam2)
-    extendedstats.registerLiveKey('team_3_time',liveTeam3)
-    extendedstats.registerLiveKey('team_1_time',liveSpec)
     extendedstats.registerCommand(scfg.command_rank,'default',cmd_rank,helplist=['Usage: !rank [method]','method is optional.','To get a list of methods use !methods'])
     extendedstats.registerCommand(scfg.command_statsme,'default',cmd_statsme,helplist=['Usage: !statsme [method]',' method is optional.','To get a list of methods use !methods'])
     extendedstats.registerCommand(scfg.command_methods,'default',cmd_methods,helplist=['Usage: !methods','Will show a list of available methods'])
@@ -108,11 +33,45 @@ def cmd_top(userid,args):
     myargs = [scfg.default_top_x,None]
     for x in range(len(args)):
         myargs[x] = args[x]
+    steamid = es.getplayersteamid(userid)
+    method = method if not extendedstats.players.query(steamid,'settings_method') else extendedstats.players.query(steamid,'settings_method')
     method = extendedstats.getMethod(myargs[1])
-    method = method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
     displayTop(userid, int(myargs[0]), method)
+
+def xs_filter(userid, message, team):
+    text = message.strip('"')
+    tokens = text.split(' ')
+    cmd = tokens[0]
+    if cmd.startswith(scfg.say_command_prefix + scfg.command_top) and len(tokens) < 3:
+        settings_method = extendedstats.players.query(es.getplayersteamid(userid),'settings_method')
+        default_method = extendedstats.dcfg['default_method']
+        token_is_given = len(tokens) == 2
+        if token_is_given:
+            token_is_given = tokens[1].lower() in extendedstats.methods
+        if token_is_given:
+            method = tokens[1].lower()
+        elif settings_method:
+            method = settings_method
+        else:
+            method = default_method 
+        x = ''.join(filter(lambda x: x.isdigit(),cmd))
+        displayTop(userid, int(x) if x != '' else scfg.default_top_x, method)
+    return (userid,text,team)
+    
+def displayTop(userid,x,method):
+    chckactive(userid)
+    pplchck('xs_top_list_%s' % userid)
+    topplayers = extendedstats.getToplist(x,method)
+    toplist = popuplib.easylist('xs_top_list_%s' % userid)
+    toplist.settitle('Top %s (%s):' % (x,method))
+    i = 1
+    for player in topplayers:
+        toplist.additem('%s: %s (%s)' % (i,extendedstats.getName(player[1]),player[0]))
+        i += 1
+    toplist.send(userid)
     
 def cmd_commands(userid,args):
+    chckactive(userid)
     if popuplib.exists('xs_commands_list'):
         popuplib.send('xs_commands_list',userid)
     else:
@@ -129,9 +88,9 @@ def cmd_rank(userid,args):
     if len(args) == 1:
         method = extendedstats.getMethod(args[0].lower())
     else:
-        player = extendedstats.data[steamid]
-        method = extendedstats.getMethod(player['settings']['method'])
-    es.tell(userid,'You are ranked %s of %s with %s points (%s)' % (extendedstats.getRank(steamid,method),len(extendedstats.data)-1,extendedstats.getScore(steamid,method),method))
+        method = extendedstats.getMethod(extendedstats.players.query(steamid,'settings_method'))
+    rank,allplayers = extendedstats.getRank(steamid,method)
+    es.tell(userid,'You are ranked %s of %s with %s points (%s)' % (rank,allplayers,extendedstats.getScore(steamid,method),method))
     
 def cmd_statsme(userid,args):
     steamid = es.getplayersteamid(userid)
@@ -140,19 +99,20 @@ def cmd_statsme(userid,args):
     tr = 0
     ts = 0
     for method in extendedstats.methods:
-        r,s = extendedstats.getRank(steamid,method), extendedstats.getScore(steamid,method)
+        r,s = extendedstats.getRank(steamid,method)[0], extendedstats.getScore(steamid,method)
         tr += r
         ts += s
         if not top or r > top:
             top = (r,s,method)
         if not low or r < low:
             low = (r,s,method)
-    dr, ds = extendedstats.getRank(steamid,extendedstats.getMethod()), extendedstats.getScore(steamid,extendedstats.getMethod())
-    player = extendedstats.data[steamid]
+    dr, ds = extendedstats.getRank(steamid,extendedstats.getMethod())[0], extendedstats.getScore(steamid,extendedstats.getMethod())
     pr, ps = None, None
-    if player['settings']['method'] in extendedstats.methods.keys():
-        pr = extendedstats.getRank(steamid,player['settings']['method'])
-        ps = extendedstats.getScore(steamid,player['settings']['method'])
+    settings_method = extendedstats.players.query(steamid,'settings_method')
+    if settings_method in extendedstats.methods.keys():
+        pr = extendedstats.getRank(steamid,settings_method)
+        ps = extendedstats.getScore(steamid,settings_method)
+    chckactive(userid)
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
     statshim.settitle('Your stats:')
@@ -164,13 +124,15 @@ def cmd_statsme(userid,args):
     if extendedstats.dcfg.as_bool('statsme_methods'):
         mlist = extendedstats.dcfg['statsme_methods']
         for method in mlist.split(';' if ';' in mlist else ','):
-            statshim.additem('%s: %s (%s)' % (method,extendedstats.getRank(steamid,method),extendedstats.getScore(steamid,method)))
+            statshim.additem('%s: %s (%s)' % (method,extendedstats.getRank(steamid,method)[0],extendedstats.getScore(steamid,method)))
     statshim.send(userid)
     
 def cmd_methods(userid,args):
+    chckactive(userid)
     popuplib.send('xs_methods_list',userid)
     
 def cmd_settings(userid,args):
+    chckactive(userid)
     pplchck('xs_settings_menu_%s' % userid)
     settingsmenu = popuplib.easymenu('xs_settings_menu_%s' % userid,'_popup_choice',settingsCallback)
     settingsmenu.settitle('Your eXtended Stats settings: Main')
@@ -180,13 +142,14 @@ def cmd_settings(userid,args):
     settingsmenu.send(userid)
     
 def settingsCallback(userid,choice,name):
-    player = extendedstats.getPlayer(es.getplayersteamid(userid))
+    steamid = es.getplayersteamid(userid)
     if choice == 'method':
         pplchck('xs_methods_menu_%s' % userid)
         methodmenu = popuplib.easymenu('xs_methods_menu_%s' % userid,'_popup_choice',settingsCallback2)
         methodmenu.settitle('Your eXtended Stats settings: Method')
+        settings_method = extendedstats.players.query(steamid,'settings_method')
         for method in extendedstats.methods.keys():
-            if method == player['settings']['method']:
+            if method == settings_method:
                 methodmenu.addoption(('method',method),'-> %s' % method)
             else:
                 methodmenu.addoption(('method',method),method)
@@ -197,8 +160,13 @@ def settingsCallback(userid,choice,name):
         pplchck('xs_name_menu_%s' % userid)
         namemenu = popuplib.easymenu('xs_name_menu_%s' % userid,'_popup_choice',settingsCallback2)
         namemenu.settitle('Your eXtended Stats settings: Name')
-        for name in player['names']:
-            if name == player['settings']['name']:
+        settings_name = extendedstats.players.query(steamid,'settings_method')
+        extendedstats.players.execute("SELECT name1,name2,name3,name4,name5 FROM xs_main WHERE steamid='%s'" % (steamid))
+        names = extendedstats.players.fetchone()
+        if not type(names) == tuple:
+            names = [names]
+        for name in names:
+            if name == settings_name:
                 namemenu.addoption(('name',name),'-> %s' % name)
             else:
                 namemenu.addoption(('name',name),name)      
@@ -209,74 +177,25 @@ def settingsCallback(userid,choice,name):
         return
         
 def settingsCallback2(userid,choice,name):
-    playersettings = extendedstats.data[es.getplayersteamid(userid)]['settings']
+    steamid = es.getplayersteamid(userid)
     if choice == 1:
         cmd_settings(userid,None)
     elif choice == 2:
         if name == 'methods_menu':
-            playersettings['method'] = None
+            extendedstats.players.update(steamid,'settings_method','NULL')
         elif name == 'name_menu':
-            playersettings['name'] = None            
+            extendedstats.players.update(steamid,'settings_name','NULL')
     else:
-        playersettings[choice[0]] = choice[1]
+        extendedstats.players.update(steamid,'settings_%s' % choice[0],choice[1])
         es.tell(userid,'Your eXtended Stats settings have been changed successfully.')
     if scfg.settings_menu_resend:
         cmd_settings(userid,None)
-    
-def displayTop(userid,x,method):
-    topplayers = extendedstats.getToplist(x,method)
-    pplchck('xs_top_list_%s' % userid)
-    toplist = popuplib.easylist('xs_top_list_%s' % userid)
-    toplist.settitle('Top %s (%s):' % (x,method))
-    i = 1
-    for player in topplayers:
-        toplist.additem('%s: %s (%s)' % (i,extendedstats.getName(player[1]),player[0]))
-        i += 1
-    toplist.send(userid)
-
-def xs_filter(userid, message, team):
-    text = message.strip('"')
-    tokens = text.split(' ')
-    cmd = tokens[0]
-    if cmd.startswith(scfg.say_command_prefix + scfg.command_top) and len(tokens) < 3:
-        method = tokens[1].lower() if len(tokens) == 2 and tokens[1].lower in extendedstats.methods else extendedstats.dcfg['default_method']
-        method =  method if not extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method'] else extendedstats.getPlayer(es.getplayersteamid(userid))['settings']['method']
-        x = ''.join(filter(lambda x: x.isdigit(),cmd))
-        displayTop(userid, int(x) if x != '' else scfg.default_top_x, method)
-    return (userid,text,team)
-        
-def liveTime(player):
-    if not 'sessionstart' in extendedstats.data[player]:
-        return extendedstats.data[player]['time']
-    return extendedstats.data[player]['time'] + time.time() - extendedstats.data[player]['sessionstart']
-    
-def liveTeam2(player):
-    if es.getplayerteam(es.getuserid(player)) != 2:
-        return extendedstats.data[player]['team_2_time']
-    if not extendedstats.data[player]['teamchange_time'] and not extendedstats.data[player]['sessionstart']:
-        return extendedstats.data[player]['team_2_time']
-    if not extendedstats.data[player]['teamchange_time']:
-        return extendedstats.data[player]['team_2_time'] + time.time() - extendedstats.data[player]['sessionstart']
-    return extendedstats.data[player]['team_2_time'] + time.time() - extendedstats.data[player]['teamchange_time']
-
-def liveTeam3(player):
-    if es.getplayerteam(es.getuserid(player)) != 3:
-        return extendedstats.data[player]['team_3_time']
-    if not extendedstats.data[player]['teamchange_time'] and not extendedstats.data[player]['sessionstart']:
-        return extendedstats.data[player]['team_3_time']
-    if not extendedstats.data[player]['teamchange_time']:
-        return extendedstats.data[player]['team_3_time'] + time.time() - extendedstats.data[player]['sessionstart']
-    return extendedstats.data[player]['team_3_time'] + time.time() - extendedstats.data[player]['teamchange_time']
-
-def liveSpec(player):
-    if es.getplayerteam(es.getuserid(player)) not in [0,1]:
-        return extendedstats.data[player]['team_1_time']
-    if not extendedstats.data[player]['teamchange_time'] and not extendedstats.data[player]['sessionstart']:
-        return extendedstats.data[player]['team_1_time']
-    if not extendedstats.data[player]['teamchange_time']:
-        return extendedstats.data[player]['team_1_time'] + time.time() - extendedstats.data[player]['sessionstart']
-    return extendedstats.data[player]['team_1_time'] + time.time() - extendedstats.data[player]['teamchange_time']
 
 def pplchck(name):
     if popuplib.exists(name):
         popuplib.delete(name)
+        
+def chckactive(userid):
+    active = popuplib.active(userid)
+    if active['object']:
+        popuplib.close(active['name'], userid) 

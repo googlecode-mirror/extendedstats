@@ -2,7 +2,7 @@
 
 # You have to import extendedstats to register your methods
 from extendedstats import extendedstats
-import path, es
+import path, es, time
 
 packagename = 'default'
 
@@ -19,48 +19,49 @@ def load():
     extendedstats.registerMethod(packagename,'killsperminute',kpm)
     if extendedstats.addonIsLoaded('extendedevents') and extendedstats.game == 'cstrike':
         extendedstats.registerMethod(packagename,'money',money)
-    extendedstats.registerMethod(packagename,'score',score)
+        extendedstats.registerMethod(packagename,'score',score)
     extendedstats.registerMethod(packagename,'damage',damage)
     
-# This simple example shows how to build you methods
-# IMPORTANT: All methods are called with a dictionary full of information about the player
-# The dict's values are floats by default, just in some rare cases they're strings
-# You can find a full list of keys on http://extendedstats.ojii.ch/?site=keylist
-def KDR(player):
+def KDR(players,steamid):
     # The following three lines are VERY IMPORTANT: Zero Division Prevention!
-    deaths = 1 # We set a new variable called deaths to 1
-    if player['deaths'] > 0: # If the player has died at least once
-        deaths = player['deaths'] # We can set the deaths variable to the actual value
-    return float(player['kills']) / float(deaths) # This all is done because we divide by deaths. Prevent your method from dividing by zero!
+    deaths = players.query(steamid,'deaths') # We set a new variable called deaths to 1
+    if deaths == 0: # If the player has died at least once
+        deaths = 1 # We can set the deaths variable to the actual value
+    return float(players.query(steamid,'kills')) / float(deaths) # This all is done because we divide by deaths. Prevent your method from dividing by zero!
     
-def PureKills(player):
+def PureKills(players,steamid):
     # Probably the easiest you can do
-    return player['kills']
+    return players.query(steamid,'kills')
 
-def PureDeaths(player):
-    return player['deaths']
+def PureDeaths(players,steamid):
+    return players.query(steamid,'deaths')
     
-def kpm(player):
+def kpm(players,steamid):
     # time is a float in seconds
-    minutes = player['time'] / 60
-    return player['kills'] / minutes
+    minutes = players.query(steamid,'time') + time.time() - players.query(steamid,'sessionstart') / 60.0
+    if minutes == 0:
+        minutes = 1
+    return players.query(steamid,'kills') / minutes
 
-def tKDR(player):
-    deaths = 1
-    if player['deaths'] - player['teamkilled'] < 0:
-        deaths = 1 / (player['deaths'] - player['teamkilled']) * -1
-    elif player['deaths'] - player['teamkilled'] > 0:
-        deaths = player['deaths'] - player['teamkilled']
-    return (player['kills']-player['teamkills']) / deaths
+def tKDR(players,steamid):
+    deaths = players.query(steamid,'deaths')
+    tkilled = players.query(steamid,'teamkilled')
+    if deaths - tkilled < 0:
+        deaths = 1 / deaths - teamkilled * -1
+    elif deaths - tkilled > 0:
+        deaths = deaths - tkilled
+    else:
+        deaths = deaths = 1
+    return (players.query(steamid,'kills') - players.query(steamid,'teamkills')) / deaths
 
-def score(player):
-    hostages = player['hostage_rescued'] * 2 + player['hostage_follows'] - player['hostage_hurt'] - player['hostage_killed'] * 2 
-    kills = player['kills'] + player['teamkilled'] - player['deaths'] - player['teamkills'] * 2 + player['headshots']
-    win = player['win'] - player['lose']
+def score(players,steamid):
+    hostages = players.query(steamid,'hostage_rescued') * 2 + players.query(steamid,'hostage_follows') - players.query(steamid,'hostage_hurt') - players.query(steamid,'hostage_killed') * 2 
+    kills = players.query(steamid,'kills') + players.query(steamid,'teamkilled') - players.query(steamid,'deaths') - players.query(steamid,'teamkills') * 2 + players.query(steamid,'headshots')
+    win = players.query(steamid,'win') - players.query(steamid,'lose')
     return hostages + kills + win
 
-def money(player):
-    return player['money'] 
+def money(players,steamid):
+    return players.query(steamid,'money')
 
-def damage(player):
-    return player['attacked_damage']
+def damage(players,steamid):
+    return players.query(steamid,'attacked_damage')

@@ -9,10 +9,11 @@ addonList = [] # list of addonnames to be importet (if allAddons False)
                # list items must be string!
 
 ### Method Importing ###
-
-allMethods = True # Just import all methods in the folder
-methodList =  [] # list of methods to be importet (if allMethods False)
-                 # list items must be string!
+allPackages = True # If true all packages will be imported, otherwise only listed
+packageList =  []  # list of methodpackages to be imported (if allMethods False)
+                   # list items must be string!
+allMethods = True  # Just import all methods from the packages
+methodList = []    # Import only selected methods
 
 ### Commands ###
 # ALL MUST BE STRINGS!!!
