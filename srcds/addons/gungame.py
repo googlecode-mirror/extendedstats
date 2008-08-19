@@ -49,4 +49,7 @@ def gungame_winner(ev):
         extendedstats.players.increment(ev['steamid'],'gg_win')
         
 def ggwon_command(userid,arguments):
-        es.tell(userid,'You have won GunGame %s times' % extendedstats.players.query(es.getplayersteamid(userid),'gg_win'))
+    if str(userid) in extendedstats.pending:
+        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        return
+    es.tell(userid,'You have won GunGame %s times' % extendedstats.players.query(es.getplayersteamid(userid),'gg_win'))

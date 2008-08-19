@@ -15,7 +15,7 @@
 ###        IMPORTS        ####
 ##############################
 
-import es, playerlib, vecmath, popuplib
+import es, playerlib, vecmath, popuplib, gamethread
 import time, path, sqlite3, sys, traceback, psyco, hashlib, base64, urllib
 psyco.full()
 
@@ -32,7 +32,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:122'
+info.version        = '0.1.0:123'
 info.versionname    = 'Bettina'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
@@ -51,6 +51,7 @@ reggedccmd = []
 reggedscmd = []
 errorhashes = []
 newconnected = []
+pending = []
 tables = {}
 cmdhelp = {}
 uniquecommands = []
@@ -160,6 +161,8 @@ def convert():
 
 def unload():
     es.unregsaycmd('!help')
+    for userid in pending:
+        gamethread.cancelDelayed('xs_delayed_%s' % userid) 
     for addon in addonsunloaders:
         addon()
     unloadCommands()
@@ -311,10 +314,10 @@ def getToplist(x,method=None):
     method = getMethod(method)
     tlist = []
     if method in players.columns:
-        players.execute("SELECT steamid,%s FROM xs_main ORDER BY %s DESC%s" % (method,method," LIMIT %s" % args[2] if args[2] else ""))
+        players.execute("SELECT steamid,%s FROM xs_main ORDER BY %s DESC LIMIT %s" % (method,method,x))
         for row in players.fetchall():
             steamid,score = row
-            tlist.append(score,steamid)
+            tlist.append((score,steamid))
     else:
         for steamid in players.getPlayerList():
             tlist.append((getScore(steamid,method),steamid))
@@ -403,16 +406,19 @@ def server_cvar(ev):
         dcfg[ev['cvarname'][3:]] = ev['cvarvalue']
         
 def player_connect(ev):
-    global newconnected
     newconnected.append(ev['userid'])
 
 def player_spawn(ev):
-    global newconnected
     print 'player_spawn'
     if not es.isbot(ev['userid']):
         steamid = es.getplayersteamid(ev['userid'])
         if not steamid:
             print 'NO STEAM ID!!!'
+            return
+        if steamid == 'STEAM_ID_PENDING':
+            print 'STEAM_ID_PENDING'
+            gamethread.delayedname(1, 'xs_delayed_%s' % ev['userid'], pendingCheck, kw={userid:ev['userid']})
+            pending.append(ev['userid']) 
             return
         if not ev['userid'] in newconnected:
             return
@@ -425,12 +431,33 @@ def player_spawn(ev):
         newname = es.getplayername(ev['userid'])
         players.name(steamid,newname)
         newconnected.remove(ev['userid'])
+        if ev['userid'] in pending:
+            pending.remove(ev['userid'])
         dbg('player spawned: %s' % steamid)
+        
+def pendingCheck(userid):
+    steamid = es.getplayersteamid(userid)
+    if steamid != 'STEAM_ID_PENDING':
+        if not steamid in players:
+            players.newplayer(steamid)
+        players.increment(steamid,'sessions')
+        players.update(steamid,'sessionstart',time.time())
+        players.update(steamid,'lastseen',time.time())
+        players.update(steamid,'teamchange_time',time.time())
+        newname = es.getplayername(ev['userid'])
+        players.name(steamid,newname)
+        newconnected.remove(ev['userid'])
+        if ev['userid'] in pending:
+            pending.remove(ev['userid'])
+    else:
+        gamethread.delayedname(1, 'xs_delayed_%s' % ev['userid'], pendingCheck, kw={userid:ev['userid']})
 
 def player_disconnect(ev):
     global newconnected
     if ev['userid'] in newconnected:
         newconnected.remove(ev['userid'])
+        if ev['userid'] in pending:
+            pending.remove(ev['userid'])
         return
     if not es.isbot(ev['userid']):
         dbg( 'player disconnected: %s' % ev['userid'])

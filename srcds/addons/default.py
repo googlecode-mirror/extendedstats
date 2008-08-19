@@ -30,6 +30,9 @@ def unload():
     es.addons.unregisterSayFilter(xs_filter)
 
 def cmd_top(userid,args):
+    if str(userid) in extendedstats.pending:
+        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        return
     myargs = [scfg.default_top_x,None]
     for x in range(len(args)):
         myargs[x] = args[x]
@@ -43,6 +46,9 @@ def xs_filter(userid, message, team):
     tokens = text.split(' ')
     cmd = tokens[0]
     if cmd.startswith(scfg.say_command_prefix + scfg.command_top) and len(tokens) < 3:
+        if str(userid) in extendedstats.pending:
+            es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+            return
         settings_method = extendedstats.players.query(es.getplayersteamid(userid),'settings_method')
         default_method = extendedstats.dcfg['default_method']
         token_is_given = len(tokens) == 2
@@ -84,6 +90,9 @@ def cmd_commands(userid,args):
         c.send(userid)
     
 def cmd_rank(userid,args):
+    if str(userid) in extendedstats.pending:
+        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        return
     steamid = es.getplayersteamid(userid)
     if len(args) == 1:
         method = extendedstats.getMethod(args[0].lower())
@@ -93,6 +102,9 @@ def cmd_rank(userid,args):
     es.tell(userid,'You are ranked %s of %s with %s points (%s)' % (rank,allplayers,extendedstats.getScore(steamid,method),method))
     
 def cmd_statsme(userid,args):
+    if str(userid) in extendedstats.pending:
+        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        return
     steamid = es.getplayersteamid(userid)
     top = None
     low = None
@@ -132,6 +144,9 @@ def cmd_methods(userid,args):
     popuplib.send('xs_methods_list',userid)
     
 def cmd_settings(userid,args):
+    if str(userid) in extendedstats.pending:
+        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        return
     chckactive(userid)
     pplchck('xs_settings_menu_%s' % userid)
     settingsmenu = popuplib.easymenu('xs_settings_menu_%s' % userid,'_popup_choice',settingsCallback)
