@@ -57,6 +57,7 @@ def player_land(ev):
                     else:
                         es.tell(ev['userid'],'You just broke your record of your longest jump! Your new record is: %.2f meters!' % (distance*0.01905))
                         es.tell(ev['userid'],'You are now ranked %s of %s. Longest jump overall is %.2f meters by %s' % (rank,allplayers,rDistance,rName))
+            extendedstats.players.update(steamid,'jump_startpos',None) 
 
 def player_money(ev):
     if not es.isbot(ev['userid']):

@@ -72,7 +72,7 @@ def displayTop(userid,x,method):
     toplist.settitle('Top %s (%s):' % (x,method))
     i = 1
     for player in topplayers:
-        toplist.additem('%s: %s (%s)' % (i,extendedstats.getName(player[1]),player[0]))
+        toplist.additem('%s: %s (%s)' % (suffix(i),extendedstats.getName(player[1]),nice(player[0])))
         i += 1
     toplist.send(userid)
     
@@ -99,13 +99,14 @@ def cmd_rank(userid,args):
     else:
         method = extendedstats.getMethod(extendedstats.players.query(steamid,'settings_method'))
     rank,allplayers = extendedstats.getRank(steamid,method)
-    es.tell(userid,'You are ranked %s of %s with %s points (%s)' % (rank,allplayers,extendedstats.getScore(steamid,method),method))
+    es.tell(userid,'You are ranked %s of %s with %s points (%s)' % (suffix(rank),allplayers,nice(extendedstats.getScore(steamid,method)),method))
     
 def cmd_statsme(userid,args):
     if str(userid) in extendedstats.pending:
         es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
         return
     steamid = es.getplayersteamid(userid)
+    methods_used = [extendedstats.dcfg['default_method']]
     top = None
     low = None
     tr = 0
@@ -115,28 +116,30 @@ def cmd_statsme(userid,args):
         tr += r
         ts += s
         if not top or r > top:
-            top = (r,s,method)
+            top = (r,nice(s),method)
         if not low or r < low:
-            low = (r,s,method)
-    dr, ds = extendedstats.getRank(steamid,extendedstats.getMethod())[0], extendedstats.getScore(steamid,extendedstats.getMethod())
+            low = (r,nice(s),method)
+    drtotal, ds = extendedstats.getRank(steamid,extendedstats.getMethod()), extendedstats.getScore(steamid,extendedstats.getMethod())
+    dr,total = drtotal
     pr, ps = None, None
     settings_method = extendedstats.players.query(steamid,'settings_method')
-    if settings_method in extendedstats.methods.keys():
-        pr = extendedstats.getRank(steamid,settings_method)
+    if settings_method in extendedstats.methods.keys() and settings_method not in methods_used:
+        pr = extendedstats.getRank(steamid,settings_method)[0]
         ps = extendedstats.getScore(steamid,settings_method)
     chckactive(userid)
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
     statshim.settitle('Your stats:')
-    statshim.additem('Rank (default method): %s (%s)' % (dr,ds))
+    statshim.additem('%s: %s of %s with %s' % (extendedstats.dcfg['default_method'],suffix(dr),total,nice(ds)))
     if pr:
-        statshim.additem('Rank (personal method): %s (%s)' % (pr,ps))
-    statshim.additem('Top rank: %s (%s) using %s' % (top))
-    statshim.additem('Low rank: %s (%s) using %s' % (low))
+        statshim.additem('%s: %s of %s with %s' % (settings_method,suffix(pr),total,nice(ps)))
+    statshim.additem('Top rank: %s of %s with %s using %s' % (suffix(top[0]),total,top[1],top[2]))
+    statshim.additem('Low rank: %s of %s with %s using %s' % (suffix(low[0]),total,low[1],low[2]))
     if extendedstats.dcfg.as_bool('statsme_methods'):
         mlist = extendedstats.dcfg['statsme_methods']
-        for method in mlist.split(';' if ';' in mlist else ','):
-            statshim.additem('%s: %s (%s)' % (method,extendedstats.getRank(steamid,method)[0],extendedstats.getScore(steamid,method)))
+        for method in filter(lambda x: x not in methods_used,mlist.split(';' if ';' in mlist else ',')):
+            methods_used.append(method)
+            statshim.additem('%s: %s of %s with %s' % (method,suffix(extendedstats.getRank(steamid,method)[0]),total,nice(extendedstats.getScore(steamid,method))))
     statshim.send(userid)
     
 def cmd_methods(userid,args):
@@ -211,6 +214,20 @@ def pplchck(name):
         popuplib.delete(name)
         
 def chckactive(userid):
-    active = popuplib.active(userid)
-    if active['object']:
-        popuplib.close(active['name'], userid) 
+    es.cexec(userid,'slot10')
+        
+def nice(score):
+    if type(score) == float:
+        return '%.3f' % score
+    return score
+
+def suffix(rank):
+    rank = str(rank)
+    end = rank[-1]
+    if end == '1':
+        return rank + 'st'
+    if end == '2':
+        return rank + 'nd'
+    if end == '3':
+        return rank + 'rd'
+    return rank + 'th'

@@ -4,7 +4,7 @@
 from extendedstats import extendedstats
 import path, es, time
 
-packagename = 'default'
+packagename = 'standard'
 
 # This function will be called when your method is imported.
 def load():
@@ -26,7 +26,7 @@ def KDR(players,steamid):
     # The following three lines are VERY IMPORTANT: Zero Division Prevention!
     deaths = players.query(steamid,'deaths') # We set a new variable called deaths to 1
     if deaths == 0: # If the player has died at least once
-        deaths = 1 # We can set the deaths variable to the actual value
+        deaths = 1.0 # We can set the deaths variable to the actual value
     return float(players.query(steamid,'kills')) / float(deaths) # This all is done because we divide by deaths. Prevent your method from dividing by zero!
     
 def PureKills(players,steamid):
@@ -38,21 +38,23 @@ def PureDeaths(players,steamid):
     
 def kpm(players,steamid):
     # time is a float in seconds
-    minutes = players.query(steamid,'time') + time.time() - players.query(steamid,'sessionstart') / 60.0
-    if minutes == 0:
-        minutes = 1
+    minutes = (players.query(steamid,'time') + time.time() - players.query(steamid,'sessionstart')) / 60.0
+    if minutes == 0.0:
+        minutes = 1.0
     return players.query(steamid,'kills') / minutes
 
 def tKDR(players,steamid):
-    deaths = players.query(steamid,'deaths')
-    tkilled = players.query(steamid,'teamkilled')
+    deaths = float(players.query(steamid,'deaths'))
+    tkilled = float(players.query(steamid,'teamkilled'))
     if deaths - tkilled < 0:
-        deaths = 1 / deaths - teamkilled * -1
+        dtk = deaths -  tkilled
+        dtk *= -1.0
+        deaths = 1.0 / dtk
     elif deaths - tkilled > 0:
         deaths = deaths - tkilled
     else:
-        deaths = deaths = 1
-    return (players.query(steamid,'kills') - players.query(steamid,'teamkills')) / deaths
+        deaths = 1.0
+    return (float(players.query(steamid,'kills')) - float(players.query(steamid,'teamkills'))) / deaths
 
 def score(players,steamid):
     hostages = players.query(steamid,'hostage_rescued') * 2 + players.query(steamid,'hostage_follows') - players.query(steamid,'hostage_hurt') - players.query(steamid,'hostage_killed') * 2 
