@@ -41,7 +41,7 @@ def kpm(players,steamid):
     minutes = (players.query(steamid,'time') + time.time() - players.query(steamid,'sessionstart')) / 60.0
     if minutes == 0.0:
         minutes = 1.0
-    return players.query(steamid,'kills') / minutes
+    return float(players.query(steamid,'kills')) / minutes
 
 def tKDR(players,steamid):
     deaths = float(players.query(steamid,'deaths'))

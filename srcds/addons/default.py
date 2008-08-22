@@ -136,8 +136,8 @@ def cmd_statsme(userid,args):
     statshim.additem('Top rank: %s of %s with %s using %s' % (suffix(top[0]),total,top[1],top[2]))
     statshim.additem('Low rank: %s of %s with %s using %s' % (suffix(low[0]),total,low[1],low[2]))
     if extendedstats.dcfg.as_bool('statsme_methods'):
-        mlist = extendedstats.dcfg['statsme_methods']
-        for method in filter(lambda x: x not in methods_used,mlist.split(';' if ';' in mlist else ',')):
+        mlist = extendedstats.dcfg.as_list('statsme_methods')
+        for method in filter(lambda x: x in extendedstats.methods,mlist):
             methods_used.append(method)
             statshim.additem('%s: %s of %s with %s' % (method,suffix(extendedstats.getRank(steamid,method)[0]),total,nice(extendedstats.getScore(steamid,method))))
     statshim.send(userid)

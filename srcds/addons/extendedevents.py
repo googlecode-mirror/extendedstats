@@ -16,8 +16,8 @@ if EE:
         columns += [('dod_captures','INTEGER DEFAULT 0')]
     elif extendedstats.game == 'cstrike':
         wcolumns = map(lambda x: ('bought_%s' % x,'INTEGER DEFAULT 0'),extendedstats.cstrike_weapons)
-    if wcolumns:
-        extendedstats.weapons.addColumns(wcolumns)
+        extendedstats.players.addColumns(wcolumns)
+        extendedstats.weapons.addColumns([('bought','INTEGER DEFAULT 0')])
     default = {
         'notify_longestjump':'1',
         'notify_longestjump_all': '0',
@@ -69,4 +69,8 @@ def weapon_purchase(ev):
         extendedstats.dbg( 'weapon purchase')
         steamid = extendedstats.sid(ev)
         weapon = ev['weapon']
-        extendedstats.weapons.increment(steamid,'%s_bought' % weapon)
+        if 'bought_%s' in extendedstats.players.columns:
+            extendedstats.players.increment(steamid,'bought_%s' % weapon)
+            extendedstats.weapons.increment(weapon,'bought')
+        else:
+            extendedstats.dbg('custom weapon, not in database...')

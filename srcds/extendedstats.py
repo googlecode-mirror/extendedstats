@@ -1,17 +1,4 @@
 ##############################
-###    Many Thanks To     ####
-##############################
-#
-# Saul:             __import__ and especially for the hasattr(...) and callable(getattr(...)) in loadAddons(...)
-# GODJonez:         __import__(...) and especially for the dict.copy() hint
-# NATO_Hunter:      __import__(...)
-# Jesse:            Tester
-# theresthatguy:    Tester
-# lindo81:          Tester, ran the addon on his server for testing. Many many thanks!
-# darkranger:       Tester, ran the addon on his server for testing. Many many thanks!
-# nexitem:          Tester, ran the addon on his server for testing. Many many thanks!
-#
-##############################
 ###        IMPORTS        ####
 ##############################
 
@@ -32,7 +19,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.0:124'
+info.version        = '0.1.1:125'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
 info.author         = 'Ojii with loads of help by others'
@@ -112,7 +99,7 @@ def resetlog():
     
 
 def unload():
-    es.unregsaycmd('!help')
+    es.unregsaycmd(scfg.say_command_prefix + scfg.command_help)
     for userid in pending:
         gamethread.cancelDelayed('xs_delayed_%s' % userid) 
     for addon in addonsunloaders:
@@ -259,7 +246,7 @@ def getScore(steamid,method):
     if method in players.columns:
         return players.query(steamid,method)
     if method not in methods:
-        method = dcfg['default_method']
+        method = dcfg['default_method'].strip()
     return methods[method](players,steamid)
 
 def getRank(steamid,method):
@@ -320,9 +307,9 @@ def makeList(text,maxchars=40):
 def getMethod(method=None):
     keys = methods.keys()
     if method in keys:
-        return method
+        return method.strip()
     if dcfg['default_method'] in keys:
-        return dcfg['default_method']
+        return dcfg['default_method'].strip()
     return methods[keys[0]]
 
 def addonIsLoaded(addonname):
@@ -495,15 +482,6 @@ def hostage_stops_following(ev):
     if not es.isbot(ev['userid']):
         dbg( 'hostage stops following')
         players.increment(sid(ev),'hostage_stops_following')
-    
-def item_pickup(ev):
-    if not es.isbot(ev['userid']):
-        item = ev['item']
-        steamid = sid(ev)
-        if item.startswith('weapon'):
-            dbg( 'weapon picked up: %s' % item)
-            weapon = item[7:]
-            weapons.increment(steamid,'pickup_%s' % weapon)
 
 def player_changename(ev):
     if not es.isbot(ev['userid']):
@@ -529,6 +507,8 @@ def player_death(ev):
     dbg('teamkill: %s (%s,%s)' % (wasTeamKill,victimTeam,attackerTeam))
     dbg('headshot: %s (%s)' % (isHeadshot,ev['headshot']))
     dbg('weapon: %s' % weapon)
+    if weapon in weapons:
+        weapons.increment(weapon,'kills')
     if wasTeamKill:
         dbg( 'teamkill')
         if not victimIsBot:
@@ -543,10 +523,16 @@ def player_death(ev):
             players.increment(attackerSteamid,'kills')
     if not victimIsBot:
         dbg( 'weapon stats (death)')
-        weapons.increment(victimSteamid,'death_%s' % weapon)
+        if 'kill_%s' % weapon in players.columns:
+            players.increment(victimSteamid,'death_%s' % weapon)
+        else:
+            dbg('Custom weapon, not in database...')
     if not attackerIsBot:
         dbg( 'weapon stats (kill)')
-        weapons.increment(attackerSteamid,'kill_%s' % weapon)
+        if 'kill_%s' % weapon in players.columns:
+            players.increment(attackerSteamid,'kill_%s' % weapon)
+        else:
+            dbg('Custom weapon, not in database...')
         if isHeadshot:
             players.increment(attackerSteamid,'headshots')
     
@@ -558,10 +544,13 @@ def player_falldamage(ev):
 def player_hurt(ev):
     victim = ev['es_steamid']
     attacker = ev['es_attackersteamid']
+    weapon = ev['es_attackerweapon']
     if game == 'cstrike':
         damage = int(ev['dmg_health']) + int(ev['dmg_armor'])
     else:
         damage = int(ev['damage'])
+    if weapon in weapons:
+        weapons.add(weapon,'damage',float(damage))
     if not es.isbot(ev['userid']):
         dbg( 'player hurt')
         players.increment(victim,'hurt')
@@ -570,6 +559,8 @@ def player_hurt(ev):
         dbg( 'player hurted')
         players.increment(attacker,'attacked')
         players.add(attacker,'attacked_damage',damage)
+        if 'damage_%s' % weapon in players.columns:
+            players.add(steamid,'damage_%s' % weapon,damage)
 
 def player_jump(ev):
     if not es.isbot(ev['userid']):
@@ -712,10 +703,11 @@ class dyncfg(dict):
             return self.__d__[s]
         L = self.__filepath__.lines(retain=False)
         for line in L:
-            if not line.startswith('#'):
+            if not line.startswith('//'):
                 var,val = line.split('=',1)
                 var = var.strip()
-                val = val.strip()
+                if val.count('//') == 1:
+                    val = val.split('//')[0].strip()
                 if var == s:
                     self.__d__[var] = val
                     self.__cvars__.append(self.__cvarprefix__ + var)
@@ -739,9 +731,12 @@ class dyncfg(dict):
         L = self.__filepath__.lines(retain=False)
         done = False
         for line in L:
-            if not line.startswith('#') and line.count('=') != 0:
+            if not line.startswith('//') and line.count('=') != 0:
                 if line.startswith(s):
-                    L[L.index(line)] = '%s = %s' % (s,v)
+                    if line.count('//') == 1:
+                        L[L.index(line)] = '%s = %s //%s' % (s,v,line.split('//')[1])
+                    else:
+                        L[L.index(line)] = '%s = %s' % (s,v)
                     done = True
                     break
         if not done:
@@ -754,10 +749,11 @@ class dyncfg(dict):
         self.__cvars__ = []
         L = self.__filepath__.lines(retain=False)
         for line in L:
-            if not line.startswith('#') and line.count('=') != 0:
+            if not line.startswith('//') and line.count('=') != 0:
                 var,val = line.split('=')
                 var = var.strip()
-                val = val.strip()
+                if val.count('//') == 1:
+                    val = val.split('//')[0].strip()
                 self.__d__[var] = val
                 es.ServerVar(self.__cvarprefix__ + var,val).addFlag('notify')
                 self.__cvars__.append(self.__cvarprefix__ + var)
@@ -770,13 +766,32 @@ class dyncfg(dict):
         return self.__cvars__
     
     def as_bool(self,s):
-        return bool(self[s])
+        return self[s].lower() in ('1','on','true')
+    
+    def as_list(self,s):
+        value = self[s]
+        if ';' in value:
+            return map(lambda x: x.strip(),value.split(';'))
+        else:
+            return map(lambda x: x.strip(),value.split(','))
+        
+    def add(self,s,v):
+        current = self.as_list(s)
+        current.append(v)
+        self[s] = ';'.join(current)
+        
+    def remove(self,s,v):
+        current = self.as_list(s)
+        if v in current:
+            current.remove(v)
+        self[s] = ';'.join(current)
+        
     
 class addonDynCfg(dict):
     def __init__(self,addonname,default={}):
         self.__an__ = addonname
         if default:
-            for key in filter(lambda x: x not in dcfg,default.keys()):
+            for key in filter(lambda x: x not in dcfg.default.keys()):
                 dcfg['%s_%s' % (addonname,key)] = default[key]
     
     def __getitem__(self,var):
@@ -784,6 +799,25 @@ class addonDynCfg(dict):
     
     def __setitem__(self,var,val):
         dcfg['%s_%s' % (self.__an__,var)] = val
+        
+    def as_bool(self, var):
+        return dcfg.as_bool('%s_%s' % (self.__an__,var))
+    
+    def as_list(self, var):
+        return dcfg.as_list('%s_%s' % (self.__an__,var))
+    
+    def keys(self):
+        return filter(lambda x: x.startswith('%s_' % self.__an__),dcfg.keys())
+    
+    def __contains__(self,var):
+        return ('%s_%s' % (self.__an__,var)) in dcfg
+    
+    def add(self,var,val):
+        dcfg.add('%s_%s' % (self.__an__,var),val)
+        
+    def remove(self,var,val):
+        dcfg.remove('%s_%s' % (self.__an__,var),val)
+        
 default = {
     'default_method': 'kdr',
     'debuglevel': '1',
@@ -792,15 +826,17 @@ default = {
 dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)
 
 class Sqlite(object):
-    def __init__(self,table,columns=[('steamid','TEXT PRIMARY KEY')]):
+    def __init__(self,table,columns=[('steamid','TEXT PRIMARY KEY')],primary_key='steamid'):
         self.con = sqlite3.connect(xspath.joinpath('database.sqlite'))
         self.cur = self.con.cursor()
         self.table = table
         self.create(columns)
         self.columns = self.getColumns()
+        self.pk = primary_key
         self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
         
     def create(self,columns):
+        self.versioncheck()
         if self.tableExists():
             existingColumns = self.getColumns()
             columns = filter(lambda x: x[0] not in existingColumns,columns)
@@ -808,6 +844,13 @@ class Sqlite(object):
         else:
             coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
             self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),True)
+            
+    def versioncheck(self):
+        if info.version == '0.1.1:125':
+            if self.tableExists():
+                if self.table == 'weapons':
+                    if 'steamid' in self.getColumns():
+                        self.execute('DROP TABLE xs_weapons',True)
         
     def tableExists(self):
         return len(self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall()) > 0
@@ -816,7 +859,7 @@ class Sqlite(object):
         return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall())
     
     def getPlayerList(self):
-        self.execute("SELECT steamid FROM xs_%s" % self.table)
+        self.execute("SELECT %s FROM xs_%s" % (self.pk,self.table))
         return self.fetchall()
     
     def numericColumn(self,key):
@@ -847,16 +890,16 @@ class Sqlite(object):
        
     def fetchone(self):
         one = self.cur.fetchone()
-        if one:
-            one = one[0]
+        if len(one) == 1:
+            return one[0]
         return one
     
     def __contains__(self,steamid):
-        self.execute("SELECT kills FROM xs_%s WHERE steamid='%s'" % (self.table,steamid))
+        self.execute("SELECT kills FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
         return bool(self.cur.fetchone()) 
     
     def query(self,steamid,key):
-        self.execute("SELECT %s FROM xs_%s WHERE steamid='%s'" % (key,self.table,steamid))
+        self.execute("SELECT %s FROM xs_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid))
         return self.fetchone()
         
     def convert(self,key,value):
@@ -865,21 +908,21 @@ class Sqlite(object):
         return "'%s'" % value
         
     def update(self,steamid,key,newvalue):
-        self.execute("UPDATE xs_%s SET %s=%s WHERE steamid='%s'" % (self.table,key,self.convert(key,newvalue),steamid),True)
+        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid),True)
         
     def increment(self,steamid,key):
         old = self.query(steamid,key)
         if not old:
             old = 0
-        self.execute("UPDATE xs_%s SET %s=%s WHERE steamid='%s'" % (self.table,key,old + 1,steamid),True)
+        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid),True)
         
     def add(self,steamid,key,amount):
         current = self.query(steamid,key)
         newamount = current + amount
-        self.execute("UPDATE xs_%s SET %s=%s WHERE steamid='%s'" % (self.table,key,newamount,steamid),True)
+        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid),True)
         
     def name(self,steamid,newname):
-        self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE steamid='%s'" % (self.table,steamid))
+        self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
         cnames = self.fetchone()
         if not cnames:
             self.update(steamid,'name1',newname)
@@ -905,8 +948,8 @@ class Sqlite(object):
         self.increment(steamid,'changename') 
 
     def newplayer(self,steamid):
-        self.execute("INSERT INTO xs_%s (steamid) VALUES ('%s')" % (self.table,steamid),True)
-        
+        self.execute("INSERT INTO xs_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid),True)
+
 dod_columns = [
     ('dod_sniper', 'INTEGER DEFAULT 0'),
     ('dod_rifleman', 'INTEGER DEFAULT 0'),
@@ -970,25 +1013,26 @@ columns = [
     ('settings_name','TEXT DEFAULT NULL'),
     ('settings_method','TEXT DEFAULT NULL'),
 ]
-if game == 'cstrike':
-    columns += cstrike_columns
-elif game == 'dod':
-    columns += dod_columns
-players = Sqlite('main',columns)
-tables['main'] = players
-weapons = None
 dod_weapons = ['world','punch','30cal', 'amerknife', 'bar', 'bazooka', 'c96', 'colt', 'frag_us','frag_ger', 'garand', 'riflegren_us', 'riflegren_ger', 'k98', 'k98_scoped', 'm1carbine', 'mg42', 'mp40', 'mp44', 'p38', 'pschreck', 'spade', 'spring', 'stick', 'thompson']
 cstrike_weapons = ['world','glock', 'usp', 'p228', 'deagle', 'fiveseven', 'elite', 'm3', 'xm1014', 'tmp', 'mac10', 'mp5navy', 'ump45', 'p90', 'famas', 'galil', 'ak47', 'scout', 'm4a1', 'sg550', 'g3sg1', 'awp', 'sg552', 'aug', 'm249', 'hegrenade', 'flashbang', 'smokegrenade', 'knife', 'c4']
 if game == 'cstrike':
-    weapons = [('steamid','TEXT PRIMARY KEY')]
-    weapons += map(lambda x: ('pickup_%s' % x,'INTEGER DEFAULT 0'),cstrike_weapons)
-    weapons += map(lambda x: ('death_%s' % x,'INTEGER DEFAULT 0'),cstrike_weapons)
-    weapons += map(lambda x: ('kill_%s' % x,'INTEGER DEFAULT 0'),cstrike_weapons)
+    columns += cstrike_columns
+    columns += map(lambda x: ('death_%s' % x,'INTEGER DEFAULT 0'),cstrike_weapons)
+    columns += map(lambda x: ('kill_%s' % x,'INTEGER DEFAULT 0'),cstrike_weapons)
+    columns += map(lambda x: ('damage_%s' % x,'REAL DEFAULT 0.0'),cstrike_weapons)
 elif game == 'dod':
-    weapons = [('steamid','TEXT PRIMARY KEY')]
-    weapons += map(lambda x: ('pickup_%s' % x,'INTEGER DEFAULT 0'),dod_weapons)
-    weapons += map(lambda x: ('death_%s' % x,'INTEGER DEFAULT 0'),dod_weapons)
-    weapons += map(lambda x: ('kill_%s' % x,'INTEGER DEFAULT 0'),dod_weapons)
-if weapons:
-    weapons = Sqlite('weapons',weapons)
-    tables['weapons'] = weapons
+    columns += dod_columns
+    columns += map(lambda x: ('death_%s' % x,'INTEGER DEFAULT 0'),dod_weapons)
+    columns += map(lambda x: ('kill_%s' % x,'INTEGER DEFAULT 0'),dod_weapons)
+    columns += map(lambda x: ('damage_%s' % x,'REAL DEFAULT 0.0'),dod_weapons)
+players = Sqlite('main',columns)
+tables['main'] = players
+weapons = None
+wcolumns = [('weapon','TEXT PRIMARY KEY'),('kills','INTEGER DEFAULT 0'),('damage','REAL DEFAULT 0.0')]
+weapons = Sqlite('weapons',wcolumns,'weapon')
+if game == 'cstrike':
+    for weapon in filter(lambda x: x not in weapons,cstrike_weapons):
+        weapons.newplayer(weapon)
+elif game == 'dod':
+    for weapon in filter(lambda x: x not in weapons,dod_weapons):
+        weapons.newplayer(weapon)

@@ -18,8 +18,9 @@ methodList = []    # Import only selected methods
 ### Commands ###
 # ALL MUST BE STRINGS!!!
 
-say_command_prefix = '!'
+say_command_prefix = '!' # prefix for say commands
 
+# command names
 command_rank = 'rank'
 command_methods = 'methods'
 command_statsme = 'statsme'
@@ -29,6 +30,8 @@ command_top = 'top'
 command_commands = 'commands'
 
 command_gungame_ggwon = 'ggwon'
+
+command_weaponstats_weaponstats = 'weaponstats'
 
 ### Misc Settings ###
 
@@ -40,3 +43,4 @@ default_top_x = 5 # INTEGER
 
 debug = True # highly recommended until final release
              # Must be bool (True,False)
+             # If true a logfile will be written
