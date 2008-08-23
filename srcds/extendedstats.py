@@ -19,7 +19,8 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.1:125'
+info.version        = '0.1.2:126'
+info.versionstatus  = 'Final'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended stats'
 info.author         = 'Ojii with loads of help by others'
@@ -791,7 +792,7 @@ class addonDynCfg(dict):
     def __init__(self,addonname,default={}):
         self.__an__ = addonname
         if default:
-            for key in filter(lambda x: x not in dcfg.default.keys()):
+            for key in filter(lambda x: x not in dcfg,default.keys()):
                 dcfg['%s_%s' % (addonname,key)] = default[key]
     
     def __getitem__(self,var):
