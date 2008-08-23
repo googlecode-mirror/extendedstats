@@ -1,4 +1,4 @@
-# Default eXtended Stats new_player for version 0.0.5:97
+# Default eXtended Stats new_player for version 0.1.2:126
 from extendedstats import extendedstats # Import eXtended Stats
 import es, time, popuplib
 
@@ -135,9 +135,9 @@ def cmd_statsme(userid,args):
         statshim.additem('%s: %s of %s with %s' % (settings_method,suffix(pr),total,nice(ps)))
     statshim.additem('Top rank: %s of %s with %s using %s' % (suffix(top[0]),total,top[1],top[2]))
     statshim.additem('Low rank: %s of %s with %s using %s' % (suffix(low[0]),total,low[1],low[2]))
-    if extendedstats.dcfg.as_bool('statsme_methods'):
+    if bool(extendedstats.dcfg['statsme_methods']):
         mlist = extendedstats.dcfg.as_list('statsme_methods')
-        for method in filter(lambda x: x in extendedstats.methods,mlist):
+        for method in filter(lambda x: x in extendedstats.methods or x in extendedstats.players.columns,mlist):
             methods_used.append(method)
             statshim.additem('%s: %s of %s with %s' % (method,suffix(extendedstats.getRank(steamid,method)[0]),total,nice(extendedstats.getScore(steamid,method))))
     statshim.send(userid)

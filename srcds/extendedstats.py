@@ -19,10 +19,10 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.2:126'
+info.version        = '0.1.2:127'
 info.versionstatus  = 'Final'
 info.basename       = 'extendedstats'
-info.name           = 'eXtended stats'
+info.name           = 'eXtended Stats'
 info.author         = 'Ojii with loads of help by others'
 info.description    = 'Stores a lot of information about players'
 
