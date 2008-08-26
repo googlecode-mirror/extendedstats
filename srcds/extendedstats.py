@@ -19,8 +19,8 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.3:129'
-info.versionstatus  = 'Final'
+info.version        = '0.1.3:130'
+info.versionstatus  = 'Beta'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
 info.author         = 'Ojii with loads of help by others'
@@ -92,6 +92,7 @@ def load():
     es.regcmd('xs_cleandb','extendedstats/cleandb')
     es.regcmd('xs_fixtoplist','extendedstats/fixtoplist')
     es.regcmd('xs_checkversion','extendedstats/checkversion')
+    es.regcmd('xs_cfgsync','extendedstast/cfgsync')
     dbg('XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
@@ -120,6 +121,7 @@ def fixtoplist():
             toplist.newplayer(steamid)
         for method in methods.keys():
             toplist.update(steamid,method,methods[method](players,steamid))
+    es.dbgmsg(0,'done')
     
     
 def checkversion():
@@ -130,7 +132,10 @@ def checkversion():
         es.dbgmsg(0,"You're version of eXtended Stats (%s) is outdated. The newest version is %s." % (localversion,esamversion))
         es.dbgmsg(0,"Please update from http://addons.eventscripts.com/addons/view/extendedstats")
     else:
-        es.dbgmsg(0,"You're version of eXtended Stats (%s) is up to date." % localversion)    
+        es.dbgmsg(0,"You're version of eXtended Stats (%s) is up to date." % localversion)
+        
+def cfgsync():
+    dcfg.sync()    
 
 def unload():
     es.unregsaycmd(scfg.say_command_prefix + scfg.command_help)
@@ -251,7 +256,8 @@ def loadToplist():
             toplist.newplayer(steamid)
             for method in methods.keys():
                 toplist.update(steamid,method,methods[method](players,steamid))
-    
+    tables['toplist'] = toplist
+                    
 ### Publics ###
         
 def registerMethod(package,name,method): # string,string,method
@@ -623,7 +629,6 @@ def player_hurt(ev):
     victim = ev['es_steamid']
     attacker = ev['es_attackersteamid']
     weapon = ev['weapon']
-    print weapon
     if game == 'cstrike':
         damage = int(ev['dmg_health']) + int(ev['dmg_armor'])
     else:
@@ -639,7 +644,7 @@ def player_hurt(ev):
         players.increment(attacker,'attacked')
         players.add(attacker,'attacked_damage',damage)
         if 'damage_%s' % weapon in players.columns:
-            players.add(steamid,'damage_%s' % weapon,damage)
+            players.add(attacker,'damage_%s' % weapon,damage)
 
 def player_jump(ev):
     if not es.isbot(ev['userid']):
@@ -855,12 +860,12 @@ class dyncfg(dict):
         else:
             return map(lambda x: x.strip(),value.split(','))
         
-    def add(self,s,v):
+    def add(self,s,v): # LIST ONLY
         current = self.as_list(s)
         current.append(v)
         self[s] = ';'.join(current)
         
-    def remove(self,s,v):
+    def remove(self,s,v): # LIST ONLY
         current = self.as_list(s)
         if v in current:
             current.remove(v)
@@ -951,7 +956,8 @@ class Sqlite(object):
         return column[2] in ('INTEGER','REAL')
         
     def addColumns(self,columns):
-        for column in columns:
+        allcolumns = self.getColumns()
+        for column in filter(lambda x: x[0] not in allcolumns,columns):
             self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),True)
         self.columns += map(lambda x: x[0],columns)
         self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
@@ -1153,3 +1159,4 @@ if game == 'cstrike':
 elif game == 'dod':
     for weapon in filter(lambda x: x not in weapons,dod_weapons):
         weapons.newplayer(weapon)
+tables['weapons'] = weapons

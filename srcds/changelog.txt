@@ -1,3 +1,15 @@
+---r130---
+-added xs_fixtoplist for manual rebuild of the toplist table (WARNING: might take some MINUTES!)
+-added xs_cfgsync command (DYNAMIC cfg only!!)
+-updated known issues, added *issue9*
+-fixed myweaponstats
+-fixed dublicate column error on load
+-fixed some minor toplist bugs (more speed again)
+-fixed missing tables in tables dictionary
+-fixed missing game check in extendedevents addon
+-fixed player hurt
+-replaced print statements with dbg(...)
+
 ---r129---
 -added xs_checkversion command
 -added xs_cleandb command

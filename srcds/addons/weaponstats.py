@@ -68,11 +68,11 @@ def cmd_myweaponstats(userid,args):
         wwe = []
     www = weapons.fetchall()
     for weapon in www:
-        wwk.append('%s_kills' % weapon)
-        wwd.append('%s_deaths' % weapon)
-        wwp.append('%s_damage' % weapon)
+        wwk.append('kill_%s' % weapon)
+        wwd.append('death_%s' % weapon)
+        wwp.append('damage_%s' % weapon)
         if EE:
-            wwe.append('%s_bought' % weapon)
+            wwe.append('bought_%s' % weapon)
     wk = ','.join(wwk)
     wd = ','.join(wwd)
     wp = ','.join(wwp)
@@ -80,23 +80,23 @@ def cmd_myweaponstats(userid,args):
         we = ','.join(wwe)
     players.execute("SELECT %s FROM xs_main WHERE steamid='%s'" % (wk,steamid))
     kills = players.fetchone()
-    top = map(lambda x: (kills[x],wwk[x].split('_')[0]),range(len(kills)))
+    top = map(lambda x: (wwk[x].split('_')[1],kills[x]),range(len(kills)))
     top.sort(reverse=True)
     top = top[0]
     players.execute("SELECT %s FROM xs_main WHERE steamid='%s'" % (wd,steamid))
     deaths = players.fetchone()
-    fear = map(lambda x: (deaths[x],wwd[x].split('_')[0]),range(len(deaths)))
+    fear = map(lambda x: (wwd[x].split('_')[1],deaths[x]),range(len(deaths)))
     fear.sort(reverse=True)
     fear = fear[0]
     players.execute("SELECT %s FROM xs_main WHERE steamid='%s'" % (wp,steamid))
     damage = players.fetchone()
-    damage = map(lambda x: (damage[x],wwp[x].split('_')[0]),range(len(damage)))
+    damage = map(lambda x: (wwp[x].split('_')[1],damage[x]),range(len(damage)))
     damage.sort(reverse=True)
     damage = damage[0]
     if EE:
         players.execute("SELECT %s FROM xs_main WHERE steamid='%s'" % (we,steamid))
         exevents = players.fetchone()
-        exevents = map(lambda x: (exevents[x],wwe[x].split('_')[0]),range(len(exevents)))
+        exevents = map(lambda x: (wwe[x].split('_')[1],exevents[x]),range(len(exevents)))
         exevents.sort(reverse=True)
         exevents = exevents[0]
     p = popuplib.easymenu('xs_ws_my%s' % userid,'_popup_choice',myweaponchoice)
@@ -120,7 +120,7 @@ def myweaponstats(userid,choice,popupid):
     steamid = es.getplayersteamid(userid)
     p = popuplib.easylist('xs_ws_my%s_%s' % (choice,userid))
     p.settitle('Weaponstats - My %s' % choice)
-    weapons.execute("SELECT %s_kills,%s_deaths,%s_damage%s FROM xs_main WHERE steamid='%s'" % (choice,choice,choice,(',%s_bought' % choice) if EE else '',steamid))
+    weapons.execute("SELECT kill_%s,death_%s,damage_%s%s FROM xs_main WHERE steamid='%s'" % (choice,choice,choice,(',bought_%s' % choice) if EE else '',steamid))
     row = weapons.fetchone()
     p.additem('Kills: %s' % row[0])
     p.additem('Killed: %s' % row[1])

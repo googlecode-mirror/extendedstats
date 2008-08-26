@@ -5,8 +5,8 @@ import es, path
 scfg = extendedstats.scfg
 
 GG = extendedstats.addonIsLoaded('gungame')
-if not GG and str(es.ServerVar('sm_gungame_enabled')) == '1':
-    GG = True
+if not GG:
+    GG = str(es.ServerVar('sm_gungame_enabled')) == '1'
 
 if GG: # check if gungame is present on the server
     columns = [
