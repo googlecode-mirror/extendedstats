@@ -1,0 +1,137 @@
+---r129---
+-added xs_checkversion command
+-added xs_cleandb command
+-added text_factory to Sqlite to prevent unicode errors
+-added drop column
+-added registerAdminCommand (console command)
+-added toplist table which should improve speed extremely
+-added myweaponstats to weaponstats addon
+-added command_weaponstats_myweaponstats to scfg
+-added debug info to player_hurt to localize OB/DODS issue with weapon damage
+-added dod_flag_capture (requires EE4)
+-added getRankScore(...) for speed issues
+-fixed popup issues
+-fixed getMethod(...)
+-fixed dynCfg
+-fixed weapon damage detection
+-fixed extreme speed improvements!
+-removed unnecessary file gungame_dods
+-removed unnecessary columns from xs_main
+
+---r127---
+-added full list option to weaponstats
+-added detailed weapon statistics to weaponstats
+-fixed statsme not showing custom values
+
+---r126---
+-added missing functions to addonDynCfg
+-added dynCfg.add (also addonDynCfg)
+-added dynCfg.remove (also addonDynCfg)
+-added missing functions to addonDynCfg
+-fixed statsme not showing values if it's a database column and not a method
+-improved dynCfg.as_bool
+
+---r125---
+-added as_list to dcfg
+-added validation on methods for statsme_methods
+-added weapon damage stats
+-added weapon stats per weapon instead of per player
+-added weaponstats addon
+-added command_weaponstats_weaponstats to scfg
+-added Sqlite.versioncheck()
+-added primar_key to Sqlite.__init__(), allows more custom sqlite tables now (eg: xs_weapons)
+-added support for gungame sourcemod (DoDS)
+-added documentation to release
+-fixed getScore for statsme_methods with spaces
+-fixed kpm bug
+-fixed won't die on custom weapons anymore
+-fixed Sqlite.fetchone()
+-fixed unkown-command error on unload
+-removed weapon pickup stats
+-moved player weapon stats to xs_main
+-changed xs_weapon database table to be pure weapons
+
+---r124---
+-fixed player_death missing columns in xs_weapons
+-fixed player_hurt missing columns in xs_main
+-fixed duplicates in statsme
+-fixed critical error on player_disconnect (requires database.sqlite to be deleted!!!)
+-fixed popup-bug (no more popups after running a command with popup open, *issue 5* and *issue 7*)
+-fixed getScore to support the new database as well (like getRank and getToplist)
+-fixed broken getRank
+-fixed broken cmd_statsme
+-fixed bug to result in extreme long jumps if landing with no jumping (eg. falling)
+-fixed wrong and missing weapon names for dods
+-fixed missing 'world' weapon
+-fixed kills per minutes
+-fixed teamKDR zero division
+-removed old database lines
+-removed clean(...)
+-removed convert(...)
+-changed default value for xs_debuglevel to 1 (no messages)
+-added nice(...) to default to prevent floating point numbers to look weird
+-added suffix(...) to default for nicer statsme/rank/top etc
+-added 'about' to help menu
+-renamed methods/default.py to methods/standard.py to prevent mix up
+
+---r123---
+-fixed getToplist(...) (main)
+-fixed steamid pending in player_spawn(...) (main)
+-added pendingCheck(...) (main), pending steam IDs will now be checked in 1 second intervals
+-added pending removal to unload
+-added pending removal to disconnect
+-added pending check to all commands (default, gungame)
+
+---r122---
+-added Sqlite class
+-added xs_converter command
+-added converter(...) (main)
+-added updateTimes(...) (main)
+-added times (team times, playtimes) will be updated on round end now
+-added xs_main sqlite database
+-added xs_weapons sqlite database
+-added allPackages (scfg)
+-added packagesList (scfg)
+-added tables dictionary
+-improved addonIsLoaded(...) (main) speed
+-changed loadAddons(...) (main) to no longer add new_player schemes
+-changed getName(...) (main) to use new interface
+-changed getToplist(...) (main) to take advantage of sqlite if possible
+-changed prune(...) (auto_prune) to take advantage of the new database
+-changed getRank(...) (main) to take advantage of sqlite if possible
+-changed getRank(...) (main) to return the rank and the amount of players in the database
+-changed methods interface to recieve the players database and steamid as arguments
+-changed no longer log all names but last 5 ones + settings_names
+-changed all data related commands to sqlite
+-changed methodsList (scfg)
+-changed allMethods (scfg)
+-changed loadPackages(...) (main)
+-changed registerMethod(...) (main): If not allMethods (scfg), only allow listed methods to register
+-changed jump_startpos to be stored as vectorstring
+-fixed loadAddons(...) (main) to no longer add new_dcfg schemes
+-fixed cmd_top(...) (default) to no longer overwrite the argument if the user uses settings
+-fixed xs_filter(...) (default) to no longer overwrite the argument if the user uses settings
+-fixed no longer add dod_captures if game is not dod (extendedevents)
+-fixed gungame to check for addonIsLoaded rather than folder existance
+-fixed: *issue 6*: dod trying to calculate cstrike method
+-renamed data to players
+-moved new player information from default to main
+-removed new_player schemes
+-removed live_keys
+-removed ignore_keys
+-removed lastseen
+-removed a lot of debug information from player_death(...) (main)
+-removed debug information from load(...) (main)
+-removed debug information from chckactive(...) (default)
+-removed live keys from wcs (no substitution yet)
+-removed key registring (default)
+-removed loadDatabase(...) (main)
+-removed saveDatabase(...) (main)
+-removed checkUpgrade(...) (main)
+-removed registerLiveKey(...) (main)
+-removed registerIgnoreKey(...) (main)
+-removed getPlayer(...) (main)
+-removed liveTime(...) (default)
+-removed liveTeam2(...) (default)
+-removed liveTeam3(...) (default)
+-removed liveSpec(...) (default)

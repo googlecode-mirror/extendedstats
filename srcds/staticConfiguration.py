@@ -32,6 +32,7 @@ command_commands = 'commands'
 command_gungame_ggwon = 'ggwon'
 
 command_weaponstats_weaponstats = 'weaponstats'
+command_weaponstats_myweaponstats = 'myweaponstats'
 
 ### Misc Settings ###
 

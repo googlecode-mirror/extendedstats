@@ -1,4 +1,4 @@
-# ExtendedEvents eXtended Stats Addon version 1.5 by Ojii
+# ExtendedEvents eXtended Stats Addon version 2.0 by Ojii
 # Compatible with ExtendedEvents 4
 
 from extendedstats import extendedstats
@@ -7,10 +7,11 @@ import es, vecmath, path
 EE = extendedstats.addonIsLoaded('extendedevents')
 if EE:
     colums = [
-        ('money','INTEGER DEFAULT 0'),
         ('jump_distance','REAL DEFAULT 0.0'),
         ('jump_longest','INTEGER DEFAULT 0'),
     ]
+    if extendedstats.game == 'cstrike':
+        columns += [('money','INTEGER DEFAULT 0')]
     wcolumns = None
     if extendedstats.game == 'dod':
         columns += [('dod_captures','INTEGER DEFAULT 0')]
@@ -29,8 +30,12 @@ def load():
     if EE:
         extendedstats.dbg( 'XS:EE: Registering extendedevents events')
         extendedstats.registerEvent('extendedevents','player_land',player_land)
-        extendedstats.registerEvent('extendedevents','player_money',player_money)
-        extendedstats.registerEvent('extendedevents','weapon_purchase',weapon_purchase)
+        if extendedstats.game == 'cstrike':
+            extendedstats.registerEvent('extendedevents','player_money',player_money)
+            extendedstats.registerEvent('extendedevents','weapon_purchase',weapon_purchase)
+        elif extendedstats.game == 'dod':
+            extendedstats.registerEvent('extendedevents','dod_flag_captured',dod_flag_captured)
+            # player jump is already in main, will now finally work for DODS with EE4
     else:
         extendedstats.dbg( 'XS:EE: No extendedevents files found')
 
@@ -74,3 +79,8 @@ def weapon_purchase(ev):
             extendedstats.weapons.increment(weapon,'bought')
         else:
             extendedstats.dbg('custom weapon, not in database...')
+
+def dod_flag_captured(ev):
+    for userid in ev['cappers'].split(','):
+        steamid = es.getplayersteamid(userid)
+        extendedstats.players.increase(increment,'dod_captures')

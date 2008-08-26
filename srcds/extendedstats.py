@@ -19,7 +19,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.2:127'
+info.version        = '0.1.3:129'
 info.versionstatus  = 'Final'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -87,7 +87,11 @@ def load():
     es.regclientcmd(scfg.command_help,'extendedstats/cmd_help')
     loadCVARS()
     loadMenus()
+    loadToplist()
     es.regcmd('xs_resetlog','extendedstats/resetlog')
+    es.regcmd('xs_cleandb','extendedstats/cleandb')
+    es.regcmd('xs_fixtoplist','extendedstats/fixtoplist')
+    es.regcmd('xs_checkversion','extendedstats/checkversion')
     dbg('XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
@@ -98,6 +102,35 @@ def load():
 def resetlog():
     errorlog.write_text('')
     
+def cleandb():
+    if es.getargc() == 2 and es.getargv(1) in tables:
+        x = tables[es.getargv(1)].dropColumns()
+    else:
+        x = players.dropColumns()
+    es.dbgmsg(0,'Database cleanup done. Removed %s unneccessary columns' % x)
+    
+def fixtoplist():
+    es.dbgmsg(0,'Fixing toplist')
+    allplayers = players.getPlayerList()
+    x = 0
+    for steamid in allplayers:
+        x += 1
+        es.dbgmsg(0,'Player %s of %s' % (x,len(allplayers)))
+        if not steamid in toplist:
+            toplist.newplayer(steamid)
+        for method in methods.keys():
+            toplist.update(steamid,method,methods[method](players,steamid))
+    
+    
+def checkversion():
+    esam = urllib.urlopen('http://addons.eventscripts.com/addons/chklatestver/extendedstats')
+    esamversion = esam.read()
+    localversion = info.version.split(':')[0]
+    if esamversion != localversion:
+        es.dbgmsg(0,"You're version of eXtended Stats (%s) is outdated. The newest version is %s." % (localversion,esamversion))
+        es.dbgmsg(0,"Please update from http://addons.eventscripts.com/addons/view/extendedstats")
+    else:
+        es.dbgmsg(0,"You're version of eXtended Stats (%s) is up to date." % localversion)    
 
 def unload():
     es.unregsaycmd(scfg.say_command_prefix + scfg.command_help)
@@ -207,6 +240,18 @@ def loadMenus():
         for x in cmdhelp[command]:
             p.additem(x)
             
+def loadToplist():
+    global toplist
+    columns = [('steamid','TEXT PRIMARY KEY')]
+    for method in methods:
+        columns.append((method,'REAL DEFAULT 0.0'))
+    toplist = Sqlite('toplist',columns,'steamid')
+    for steamid in players.getPlayerList():
+        if not steamid in toplist:
+            toplist.newplayer(steamid)
+            for method in methods.keys():
+                toplist.update(steamid,method,methods[method](players,steamid))
+    
 ### Publics ###
         
 def registerMethod(package,name,method): # string,string,method
@@ -248,6 +293,9 @@ def getScore(steamid,method):
         return players.query(steamid,method)
     if method not in methods:
         method = dcfg['default_method'].strip()
+    steamidlist = map(lambda x: es.getplayersteamid(x),playerlib.getUseridList('#human'))
+    if not steamid in steamidlist:
+        return toplist.query(steamid,method)
     return methods[method](players,steamid)
 
 def getRank(steamid,method):
@@ -256,13 +304,29 @@ def getRank(steamid,method):
         players.execute("SELECT steamid FROM xs_main ORDER BY %s DESC" % (method))
         allplayers = players.fetchall()
         return allplayers.index(steamid) + 1,len(allplayers)
-    x = 1
-    score = getScore(steamid,method)
-    allplayers = players.getPlayerList()
-    for player in filter(lambda x: x != steamid,allplayers):
-        if getScore(player,method) > score:
-            x += 1
-    return x, len(allplayers)
+    else:
+        for userid in playerlib.getUseridList('#human'):
+            steamid = es.getplayersteamid(userid)
+            toplist.update(steamid,method,methods[method](players,steamid))
+        toplist.execute("SELECT steamid FROM xs_toplist ORDER BY %s DESC" % method)
+        allplayers = toplist.fetchall()
+    return allplayers.index(steamid) + 1,len(allplayers)
+
+def getRankScore(steamid,method,refresh=False):
+    method = getMethod(method)
+    if method in players.columns:
+        players.execute("SELECT %s,steamid FROM xs_main ORDER BY %s DESC" % (method,method))
+        allplayers = players.fetchall()
+    else:
+        if refresh:
+            for userid in playerlib.getUseridList('#human'):
+                steamid = es.getplayersteamid(userid)
+                toplist.update(steamid,method,methods[method](players,steamid))
+        toplist.execute("SELECT %s,steamid FROM xs_toplist ORDER BY %s DESC" % (method,method))
+        allplayers = toplist.fetchall()
+    index = map(lambda x: x[1],allplayers).index(steamid)
+    return index + 1,allplayers[index][0],len(allplayers)
+    #      RANK      SCORE                PLAYERCOUNT
 
 def getToplist(x,method=None):
     method = getMethod(method)
@@ -273,9 +337,14 @@ def getToplist(x,method=None):
             steamid,score = row
             tlist.append((score,steamid))
     else:
-        for steamid in players.getPlayerList():
-            tlist.append((getScore(steamid,method),steamid))
-        tlist.sort(reverse=True)
+        for userid in playerlib.getUseridList('#human'):
+            steamid = es.getplayersteamid(userid)
+            score = methods[method](players,steamid)
+            toplist.update(steamid,method,score)
+        query = "SELECT %s,steamid FROM xs_toplist ORDER BY %s DESC LIMIT %s" % (method,method,x)
+        toplist.execute(query)
+        for row in toplist.fetchall():
+            tlist.append(row)
     return tlist
 
 def getName(steamid):
@@ -307,11 +376,13 @@ def makeList(text,maxchars=40):
 
 def getMethod(method=None):
     keys = methods.keys()
+    if not method and dcfg['default_method'] in keys:
+        return dcfg['default_method']
     if method in keys:
         return method.strip()
     if dcfg['default_method'] in keys:
         return dcfg['default_method'].strip()
-    return methods[keys[0]]
+    return keys[0]
 
 def addonIsLoaded(addonname):
     return addonname in loadedAddonsList
@@ -363,14 +434,14 @@ def player_connect(ev):
     newconnected.append(ev['userid'])
 
 def player_spawn(ev):
-    print 'player_spawn'
+    dbg('player_spawn')
     if not es.isbot(ev['userid']):
         steamid = es.getplayersteamid(ev['userid'])
         if not steamid:
-            print 'NO STEAM ID!!!'
+            dbg('NO STEAM ID!!!')
             return
         if steamid == 'STEAM_ID_PENDING':
-            print 'STEAM_ID_PENDING'
+            dbg('STEAM_ID_PENDING')
             gamethread.delayedname(1, 'xs_delayed_%s' % ev['userid'], pendingCheck, kw={userid:ev['userid']})
             pending.append(ev['userid']) 
             return
@@ -378,6 +449,8 @@ def player_spawn(ev):
             return
         if not steamid in players:
             players.newplayer(steamid)
+        if not steamid in toplist:
+            toplist.newplayer(steamid)
         players.increment(steamid,'sessions')
         players.update(steamid,'sessionstart',time.time())
         players.update(steamid,'lastseen',time.time())
@@ -394,6 +467,8 @@ def pendingCheck(userid):
     if steamid != 'STEAM_ID_PENDING':
         if not steamid in players:
             players.newplayer(steamid)
+        if not steamid in toplist:
+            toplist.newplayer(steamid)
         players.increment(steamid,'sessions')
         players.update(steamid,'sessionstart',time.time())
         players.update(steamid,'lastseen',time.time())
@@ -426,6 +501,8 @@ def player_disconnect(ev):
             players.add(steamid,'team_' + str(cteam) + '_time',time.time() - players.query(steamid,'teamchange_time'))
         players.update(steamid,'teamchange_time',time.time())
         players.update(steamid,'current_team',0)
+        for method in methods.keys():
+            toplist.update(steamid,method,methods[method](players,steamid))
     
 def bomb_defused(ev):
     if not es.isbot(ev['userid']):
@@ -545,7 +622,8 @@ def player_falldamage(ev):
 def player_hurt(ev):
     victim = ev['es_steamid']
     attacker = ev['es_attackersteamid']
-    weapon = ev['es_attackerweapon']
+    weapon = ev['weapon']
+    print weapon
     if game == 'cstrike':
         damage = int(ev['dmg_health']) + int(ev['dmg_armor'])
     else:
@@ -701,7 +779,7 @@ class dyncfg(dict):
     def __getitem__(self,s):
         s = str(s)
         if s in self.__d__:
-            return self.__d__[s]
+            return self.__d__[s].strip()
         L = self.__filepath__.lines(retain=False)
         for line in L:
             if not line.startswith('//'):
@@ -712,7 +790,8 @@ class dyncfg(dict):
                 if var == s:
                     self.__d__[var] = val
                     self.__cvars__.append(self.__cvarprefix__ + var)
-                    return val
+                self[var] = val
+                return val.strip()
         return None
     
     def __contains__(self,s):
@@ -829,10 +908,12 @@ dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)
 class Sqlite(object):
     def __init__(self,table,columns=[('steamid','TEXT PRIMARY KEY')],primary_key='steamid'):
         self.con = sqlite3.connect(xspath.joinpath('database.sqlite'))
+        self.con.text_factory = str
         self.cur = self.con.cursor()
         self.table = table
+        self.columns = []
         self.create(columns)
-        self.columns = self.getColumns()
+        self.columns = map(lambda x: x[0],columns)
         self.pk = primary_key
         self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
         
@@ -840,8 +921,8 @@ class Sqlite(object):
         self.versioncheck()
         if self.tableExists():
             existingColumns = self.getColumns()
-            columns = filter(lambda x: x[0] not in existingColumns,columns)
-            self.addColumns(columns)
+            newcolumns = filter(lambda x: x[0] not in existingColumns,columns)
+            self.addColumns(newcolumns)
         else:
             coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
             self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),True)
@@ -872,8 +953,42 @@ class Sqlite(object):
     def addColumns(self,columns):
         for column in columns:
             self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),True)
-        self.columns = self.getColumns()
+        self.columns += map(lambda x: x[0],columns)
         self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
+        
+    def dropColumns(self):
+        oldcolumns = filter(lambda x: x not in self.columns,self.getColumns())
+        if not oldcolumns:
+            return 0
+        self.cur.execute("PRAGMA table_info(xs_%s)" % self.table)
+        colnames = []
+        coldef = []
+        for row in self.cur.fetchall():
+            if row[1] in oldcolumns:
+                continue
+            colnames.append(row[1])
+            coldef.append('%s %s %s' % (row[1],row[2],'DEFAULT %s' % row[4] if not int(row[5]) == 1 else 'PRIMARY KEY'))
+        coldef =  ', '.join(coldef)
+        self.cur.execute("SELECT %s FROM xs_%s" % (', '.join(colnames),self.table))
+        queries = []
+        for row in self.cur.fetchall():
+            values = []
+            for val in row:
+                if type(val) in (float,int):
+                    values.append(str(val))
+                elif not val:
+                    values.append('NULL')
+                else:
+                    values.append("'%s'" % val)
+            queries.append("INSERT INTO xs_%s (%s) VALUES (%s)" % (self.table,', '.join(colnames),', '.join(values)))
+        self.cur.execute("DROP TABLE xs_%s" % self.table)
+        self.con.commit()
+        self.cur.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef))
+        for query in queries:
+            self.cur.execute(query)
+        self.con.commit()
+        self.columns = self.getColumns()
+        return len(oldcolumns)
         
     def execute(self,sql,save=False):
         self.cur.execute(sql)
@@ -896,7 +1011,7 @@ class Sqlite(object):
         return one
     
     def __contains__(self,steamid):
-        self.execute("SELECT kills FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        self.execute("SELECT * FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
         return bool(self.cur.fetchone()) 
     
     def query(self,steamid,key):
@@ -909,7 +1024,8 @@ class Sqlite(object):
         return "'%s'" % value
         
     def update(self,steamid,key,newvalue):
-        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid),True)
+        query = "UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid)
+        self.execute(query,True)
         
     def increment(self,steamid,key):
         old = self.query(steamid,key)

@@ -59,13 +59,12 @@ def xs_filter(userid, message, team):
         elif settings_method:
             method = settings_method
         else:
-            method = default_method 
+            method = default_method
         x = ''.join(filter(lambda x: x.isdigit(),cmd))
         displayTop(userid, int(x) if x != '' else scfg.default_top_x, method)
     return (userid,text,team)
     
 def displayTop(userid,x,method):
-    chckactive(userid)
     pplchck('xs_top_list_%s' % userid)
     topplayers = extendedstats.getToplist(x,method)
     toplist = popuplib.easylist('xs_top_list_%s' % userid)
@@ -77,7 +76,6 @@ def displayTop(userid,x,method):
     toplist.send(userid)
     
 def cmd_commands(userid,args):
-    chckactive(userid)
     if popuplib.exists('xs_commands_list'):
         popuplib.send('xs_commands_list',userid)
     else:
@@ -111,22 +109,22 @@ def cmd_statsme(userid,args):
     low = None
     tr = 0
     ts = 0
+    refresh = True
     for method in extendedstats.methods:
-        r,s = extendedstats.getRank(steamid,method)[0], extendedstats.getScore(steamid,method)
+        r,s,a = extendedstats.getRankScore(steamid,method,refresh)
+        if refresh:
+            refresh = False
         tr += r
         ts += s
         if not top or r > top:
             top = (r,nice(s),method)
         if not low or r < low:
             low = (r,nice(s),method)
-    drtotal, ds = extendedstats.getRank(steamid,extendedstats.getMethod()), extendedstats.getScore(steamid,extendedstats.getMethod())
-    dr,total = drtotal
+    dr,ds, total = extendedstats.getRankScore(steamid,extendedstats.getMethod())
     pr, ps = None, None
     settings_method = extendedstats.players.query(steamid,'settings_method')
     if settings_method in extendedstats.methods.keys() and settings_method not in methods_used:
-        pr = extendedstats.getRank(steamid,settings_method)[0]
-        ps = extendedstats.getScore(steamid,settings_method)
-    chckactive(userid)
+        pr,ps,pa = extendedstats.getRankScore(steamid,settings_method)
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
     statshim.settitle('Your stats:')
@@ -139,18 +137,19 @@ def cmd_statsme(userid,args):
         mlist = extendedstats.dcfg.as_list('statsme_methods')
         for method in filter(lambda x: x in extendedstats.methods or x in extendedstats.players.columns,mlist):
             methods_used.append(method)
-            statshim.additem('%s: %s of %s with %s' % (method,suffix(extendedstats.getRank(steamid,method)[0]),total,nice(extendedstats.getScore(steamid,method))))
+            r,s,a = extendedstats.getRankScore(steamid,method)
+            rank = suffix(r)
+            score = nice(s)
+            statshim.additem('%s: %s of %s with %s' % (method,rank,total,score))
     statshim.send(userid)
     
 def cmd_methods(userid,args):
-    chckactive(userid)
     popuplib.send('xs_methods_list',userid)
     
 def cmd_settings(userid,args):
     if str(userid) in extendedstats.pending:
         es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
         return
-    chckactive(userid)
     pplchck('xs_settings_menu_%s' % userid)
     settingsmenu = popuplib.easymenu('xs_settings_menu_%s' % userid,'_popup_choice',settingsCallback)
     settingsmenu.settitle('Your eXtended Stats settings: Main')
@@ -212,9 +211,6 @@ def settingsCallback2(userid,choice,name):
 def pplchck(name):
     if popuplib.exists(name):
         popuplib.delete(name)
-        
-def chckactive(userid):
-    es.cexec(userid,'slot10')
         
 def nice(score):
     if type(score) == float:
