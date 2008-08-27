@@ -1,3 +1,6 @@
+---r134---
+-added BEGIN and COMMIT to write-sql
+
 ---r133---
 -rollback to r130 because of locked database issues
 -removed commit() on: Sqlite.update(...), Sqlite.increment(...) and Sqlite.add(...)

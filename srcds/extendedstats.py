@@ -19,7 +19,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.3:133'
+info.version        = '0.1.3:134'
 info.versionstatus  = 'Beta'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -1033,19 +1033,25 @@ class Sqlite(object):
         return "'%s'" % value
         
     def update(self,steamid,key,newvalue):
+        self.execute("BEGIN")
         query = "UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid)
         self.execute(query)
+        self.execute("COMMIT")
         
     def increment(self,steamid,key):
         old = self.query(steamid,key)
         if not old:
             old = 0
+        self.execute("BEGIN")
         self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid))
+        self.execute("COMMIT")
         
     def add(self,steamid,key,amount):
         current = self.query(steamid,key)
         newamount = current + amount
+        self.execute("BEGIN")
         self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid))
+        self.execute("COMMIT")
         
     def name(self,steamid,newname):
         self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
