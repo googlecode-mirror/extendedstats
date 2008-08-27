@@ -1,3 +1,8 @@
+---r131---
+-moved database save to round_end (hopefully reduces lag) (*issue 12*)
+-added __del__ to Sqlite
+-added sqlite3.enable_shared_cache(True), hopefully fixes lock issues (*issue 13*) caused by delayed commit
+
 ---r130---
 -added xs_fixtoplist for manual rebuild of the toplist table (WARNING: might take some MINUTES!)
 -added xs_cfgsync command (DYNAMIC cfg only!!)

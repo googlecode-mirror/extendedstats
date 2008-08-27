@@ -5,6 +5,7 @@
 import es, playerlib, vecmath, popuplib, gamethread
 import time, path, sqlite3, sys, traceback, psyco, base64, urllib
 psyco.full()
+sqlite3.enable_shared_cache(True)
 
 ##############################
 ###  STATIC CONFIGURATION  ###
@@ -19,7 +20,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.3:130'
+info.version        = '0.1.3:131'
 info.versionstatus  = 'Beta'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -693,6 +694,8 @@ def round_end(ev):
         players.increment(es.getplayersteamid(userid),'lose')
     dcfg.sync()
     updateTimes()
+    for table in tables:
+        tables[table].save()
 
 def server_addban(ev):
     if not es.isbot(ev['userid']):
@@ -739,6 +742,8 @@ def dod_round_win(ev):
         players.increment(es.getplayersteamid(userid),'lose')
     dcfg.sync()
     updateTimes()
+    for table in tables:
+        tables[table].save()
 
 def dod_bomb_exploded(ev):
     if not es.isbot(ev['userid']):
@@ -930,14 +935,14 @@ class Sqlite(object):
             self.addColumns(newcolumns)
         else:
             coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
-            self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),True)
+            self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef))
             
     def versioncheck(self):
         if info.version == '0.1.1:125':
             if self.tableExists():
                 if self.table == 'weapons':
                     if 'steamid' in self.getColumns():
-                        self.execute('DROP TABLE xs_weapons',True)
+                        self.execute('DROP TABLE xs_weapons')
         
     def tableExists(self):
         return len(self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall()) > 0
@@ -958,7 +963,7 @@ class Sqlite(object):
     def addColumns(self,columns):
         allcolumns = self.getColumns()
         for column in filter(lambda x: x[0] not in allcolumns,columns):
-            self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),True)
+            self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]))
         self.columns += map(lambda x: x[0],columns)
         self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
         
@@ -996,10 +1001,11 @@ class Sqlite(object):
         self.columns = self.getColumns()
         return len(oldcolumns)
         
-    def execute(self,sql,save=False):
+    def execute(self,sql):
         self.cur.execute(sql)
-        if save:
-            self.con.commit()
+   
+    def save(self):
+        self.con.commit()
             
     def fetchall(self):
         trueValues = []
@@ -1031,18 +1037,18 @@ class Sqlite(object):
         
     def update(self,steamid,key,newvalue):
         query = "UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid)
-        self.execute(query,True)
+        self.execute(query)
         
     def increment(self,steamid,key):
         old = self.query(steamid,key)
         if not old:
             old = 0
-        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid),True)
+        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid))
         
     def add(self,steamid,key,amount):
         current = self.query(steamid,key)
         newamount = current + amount
-        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid),True)
+        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid))
         
     def name(self,steamid,newname):
         self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
@@ -1071,7 +1077,10 @@ class Sqlite(object):
         self.increment(steamid,'changename') 
 
     def newplayer(self,steamid):
-        self.execute("INSERT INTO xs_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid),True)
+        self.execute("INSERT INTO xs_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid))
+        
+    def __del__(self):
+        self.con.close()
 
 dod_columns = [
     ('dod_sniper', 'INTEGER DEFAULT 0'),
