@@ -1,3 +1,7 @@
+---r135---
+-removed BEGIN and COMIT to write-sql
+-added query type check and commit() base on that types
+
 ---r134---
 -added BEGIN and COMMIT to write-sql
 

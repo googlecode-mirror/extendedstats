@@ -19,7 +19,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.3:134'
+info.version        = '0.1.3:135'
 info.versionstatus  = 'Beta'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -912,6 +912,7 @@ dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)
 
 class Sqlite(object):
     def __init__(self,table,columns=[('steamid','TEXT PRIMARY KEY')],primary_key='steamid'):
+        self.last_query_type = 0 # QUERY TYPES: 0: none, 1: DML, 2: non-DML
         self.con = sqlite3.connect(xspath.joinpath('database.sqlite'))
         self.con.text_factory = str
         self.cur = self.con.cursor()
@@ -930,27 +931,27 @@ class Sqlite(object):
             self.addColumns(newcolumns)
         else:
             coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
-            self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),True)
+            self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),1,True)
             
     def versioncheck(self):
         if info.version == '0.1.1:125':
             if self.tableExists():
                 if self.table == 'weapons':
                     if 'steamid' in self.getColumns():
-                        self.execute('DROP TABLE xs_weapons',True)
+                        self.execute('DROP TABLE xs_weapons',1,True)
         
     def tableExists(self):
         return len(self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall()) > 0
         
     def getColumns(self):
-        return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall())
+        return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xs_%s)' % (self.table)).fetchall())
     
     def getPlayerList(self):
-        self.execute("SELECT %s FROM xs_%s" % (self.pk,self.table))
+        self.execute("SELECT %s FROM xs_%s" % (self.pk,self.table),2)
         return self.fetchall()
     
     def numericColumn(self,key):
-        self.execute('PRAGMA table_info(xs_%s)' % self.table)
+        self.execute('PRAGMA table_info(xs_%s)' % self.table,2)
         all = self.fetchall()
         column = filter(lambda x: x[1] == key,all)[0]
         return column[2] in ('INTEGER','REAL')
@@ -958,7 +959,7 @@ class Sqlite(object):
     def addColumns(self,columns):
         allcolumns = self.getColumns()
         for column in filter(lambda x: x[0] not in allcolumns,columns):
-            self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),True)
+            self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),1,True)
         self.columns += map(lambda x: x[0],columns)
         self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
         
@@ -966,7 +967,7 @@ class Sqlite(object):
         oldcolumns = filter(lambda x: x not in self.columns,self.getColumns())
         if not oldcolumns:
             return 0
-        self.cur.execute("PRAGMA table_info(xs_%s)" % self.table)
+        self.cur.execute("PRAGMA table_info(xs_%s)" % self.table,2)
         colnames = []
         coldef = []
         for row in self.cur.fetchall():
@@ -975,7 +976,7 @@ class Sqlite(object):
             colnames.append(row[1])
             coldef.append('%s %s %s' % (row[1],row[2],'DEFAULT %s' % row[4] if not int(row[5]) == 1 else 'PRIMARY KEY'))
         coldef =  ', '.join(coldef)
-        self.cur.execute("SELECT %s FROM xs_%s" % (', '.join(colnames),self.table))
+        self.cur.execute("SELECT %s FROM xs_%s" % (', '.join(colnames),self.table),2)
         queries = []
         for row in self.cur.fetchall():
             values = []
@@ -986,19 +987,22 @@ class Sqlite(object):
                     values.append('NULL')
                 else:
                     values.append("'%s'" % val)
-            queries.append("INSERT INTO xs_%s (%s) VALUES (%s)" % (self.table,', '.join(colnames),', '.join(values)))
-        self.cur.execute("DROP TABLE xs_%s" % self.table)
+            queries.append("INSERT INTO xs_%s (%s) VALUES (%s)" % (self.table,', '.join(colnames),', '.join(values)),1)
+        self.cur.execute("DROP TABLE xs_%s" % self.table,1)
         self.commit()
-        self.cur.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef))
+        self.cur.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),1)
         for query in queries:
             self.cur.execute(query)
         self.commit()
         self.columns = self.getColumns()
         return len(oldcolumns)
         
-    def execute(self,sql,save=False):
+    def execute(self,sql,query_type,explicit_save=False):
+        if query_type != self.last_query_type:
+            self.commit()
+            self.last_query_type = query_type
         self.cur.execute(sql)
-        if save:
+        if explicit_save:
             self.commit()
             
     def commit(self):
@@ -1020,11 +1024,11 @@ class Sqlite(object):
         return one
     
     def __contains__(self,steamid):
-        self.execute("SELECT * FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        self.execute("SELECT * FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid),2)
         return bool(self.cur.fetchone()) 
     
     def query(self,steamid,key):
-        self.execute("SELECT %s FROM xs_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid))
+        self.execute("SELECT %s FROM xs_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid),2)
         return self.fetchone()
         
     def convert(self,key,value):
@@ -1033,28 +1037,28 @@ class Sqlite(object):
         return "'%s'" % value
         
     def update(self,steamid,key,newvalue):
-        self.execute("BEGIN")
+        #self.execute("BEGIN")
         query = "UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid)
-        self.execute(query)
-        self.execute("COMMIT")
+        self.execute(query,1)
+        #self.execute("COMMIT")
         
     def increment(self,steamid,key):
         old = self.query(steamid,key)
         if not old:
             old = 0
-        self.execute("BEGIN")
-        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid))
-        self.execute("COMMIT")
+        #self.execute("BEGIN")
+        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid),1)
+        #self.execute("COMMIT")
         
     def add(self,steamid,key,amount):
         current = self.query(steamid,key)
         newamount = current + amount
-        self.execute("BEGIN")
-        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid))
-        self.execute("COMMIT")
+        #self.execute("BEGIN")
+        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid),1)
+        #self.execute("COMMIT")
         
     def name(self,steamid,newname):
-        self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid),2)
         cnames = self.fetchone()
         if not cnames:
             self.update(steamid,'name1',newname)
@@ -1080,7 +1084,7 @@ class Sqlite(object):
         self.increment(steamid,'changename') 
 
     def newplayer(self,steamid):
-        self.execute("INSERT INTO xs_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid),True)
+        self.execute("INSERT INTO xs_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid),1)
 
 dod_columns = [
     ('dod_sniper', 'INTEGER DEFAULT 0'),
