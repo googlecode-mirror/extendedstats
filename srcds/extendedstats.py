@@ -19,7 +19,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.1.3:135'
+info.version        = '0.1.5:136'
 info.versionstatus  = 'Beta'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -112,9 +112,8 @@ def cleandb():
     
 def fixtoplist():
     es.dbgmsg(0,'Fixing toplist')
-    allplayers = players.getPlayerList()
     x = 0
-    for steamid in allplayers:
+    for steamid in players:
         x += 1
         es.dbgmsg(0,'Player %s of %s' % (x,len(allplayers)))
         if not steamid in toplist:
@@ -251,7 +250,7 @@ def loadToplist():
     for method in methods:
         columns.append((method,'REAL DEFAULT 0.0'))
     toplist = Sqlite('toplist',columns,'steamid')
-    for steamid in players.getPlayerList():
+    for steamid in players:
         if not steamid in toplist:
             toplist.newplayer(steamid)
             for method in methods.keys():
@@ -693,6 +692,8 @@ def round_end(ev):
         players.increment(es.getplayersteamid(userid),'lose')
     dcfg.sync()
     updateTimes()
+    players.commit()
+    weapons.commit()
 
 def server_addban(ev):
     if not es.isbot(ev['userid']):
@@ -739,6 +740,8 @@ def dod_round_win(ev):
         players.increment(es.getplayersteamid(userid),'lose')
     dcfg.sync()
     updateTimes()
+    players.commit()
+    weapons.commit()
 
 def dod_bomb_exploded(ev):
     if not es.isbot(ev['userid']):
@@ -908,7 +911,7 @@ default = {
     'debuglevel': '1',
     'statsme_methods': '',
 }
-dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)
+dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)  
 
 class Sqlite(object):
     def __init__(self,table,columns=[('steamid','TEXT PRIMARY KEY')],primary_key='steamid'):
@@ -1085,6 +1088,451 @@ class Sqlite(object):
 
     def newplayer(self,steamid):
         self.execute("INSERT INTO xs_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid),1)
+        
+### EXPERIMENTAL NEW SQLITE WRAPPER CLASSES ###
+
+import sqlite3,path
+
+xspath = path.path('/home/jonas/xstest/')
+
+class Database(object):
+    def __init__(self,tablename,columns,primary_key):
+        self.p = Persistence(tablename,columns,primary_key) # disk version
+        persistance = self.p.get() # get the current db contents from disk
+        self.r = Runtime(tablename,columns,primary_key,persistance) # runtime version
+        self.c = Changes(tablename,columns,primary_key) # changes version
+        #for userid in playerlib.getUseridList('#human'): # add current users to changes table
+        #    steamid = es.getplayersteamid(userid)
+        #    self.c.newplayer(steamid)
+            
+    def commit(self):
+        self.p.update(self.r.commit()) # write runtime contents to persistence
+        
+    def get(self):
+        return self.c.get() # get changes for submission
+    
+    def __iter__(self): # iterate over the primary keys
+        return self.r.__iter__()
+    
+    def __contains__(self,item): # check if a player is in the database
+        return item in self.r
+    
+    def addColumns(self,columns):
+        self.r.addColumns(columns)
+        self.c.addColumns(columns)
+        self.p.addColumns(columns) # won't be added to the database until self.commit()
+        
+    def dropColumns(self,columns):
+        self.r.dropColumns(columns)
+        self.c.dropColumns(columns)
+        self.p.dropColumns(columns)
+    
+    def query(self,steamid,key):
+        return self.r.query(steamid,key)
+        
+    def update(self,steamid,key,newvalue):
+        self.r.update(steamid,key,newvalue)
+        self.c.update(steamid,key,newvalue)
+        
+    def increment(self,steamid,key):
+        self.r.increment(steamid,key) 
+        self.c.increment(steamid,key)
+        
+    def add(self,steamid,key,amount):
+        self.r.add(steamid,key,amount)
+        self.c.add(setamid,key,amount)
+        
+    def name(self,steamid,newname):
+        self.r.name(steamid,newname)
+        self.c.name(steamid,newname)
+
+    def newplayer(self,steamid):
+        self.r.newplayer(steamid)
+        self.c.newplayer(steamid)
+
+class Runtime(object): # TEMP table...
+    def __init__(self,table,columns,primary_key,persistance):
+        self.con = sqlite3.connect(xspath.joinpath('database.sqlite'))
+        self.con.text_factory = str
+        self.cur = self.con.cursor()
+        self.table = table
+        coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
+        self.execute("CREATE TEMPORARY TABLE xst_%s (%s)" % (self.table,coldef))
+        self.columns = map(lambda x: x[0],columns)
+        self.pk = primary_key
+        self._numericColumns = filter(lambda x: self._numericColumn(x),self.columns)
+        for player in persistance:
+            self.execute("INSERT INTO xst_%s VALUES (%s)" % (self.table,player))
+        
+    def _getColumns(self):
+        return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xst_%s)' % (self.table)).fetchall())
+    
+    def __iter__(self):
+        self.execute("SELECT %s FROM xst_%s" % (self.pk,self.table))
+        return iter(self.fetchall())
+    
+    def _numericColumn(self,key):
+        self.execute('PRAGMA table_info(xst_%s)' % self.table)
+        all = self.fetchall()
+        column = filter(lambda x: x[1] == key,all)[0]
+        return column[2] in ('INTEGER','REAL')
+        
+    def addColumns(self,columns):
+        allcolumns = self._getColumns()
+        for column in filter(lambda x: x[0] not in allcolumns,columns):
+            self.execute("ALTER TABLE xst_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),1,True)
+        self.columns += map(lambda x: x[0],columns)
+        self._numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
+        
+    def dropColumns(self):
+        oldcolumns = filter(lambda x: x not in self.columns,self._getColumns())
+        if not oldcolumns:
+            return 0
+        self.cur.execute("PRAGMA table_info(xst_%s)" % self.table)
+        colnames = []
+        coldef = []
+        for row in self.cur.fetchall():
+            if row[1] in oldcolumns:
+                continue
+            colnames.append(row[1])
+            coldef.append('%s %s %s' % (row[1],row[2],'DEFAULT %s' % row[4] if not int(row[5]) == 1 else 'PRIMARY KEY'))
+        coldef =  ', '.join(coldef)
+        self.cur.execute("SELECT %s FROM xst_%s" % (', '.join(colnames),self.table),2)
+        queries = []
+        for row in self.cur.fetchall():
+            values = []
+            for val in row:
+                if type(val) in (float,int):
+                    values.append(str(val))
+                elif not val:
+                    values.append('NULL')
+                else:
+                    values.append("'%s'" % val)
+            queries.append("INSERT INTO xst_%s (%s) VALUES (%s)" % (self.table,', '.join(colnames),', '.join(values)),1)
+        self.cur.execute("DROP TEMPORARY TABLE xst_%s" % self.table,1)
+        self.cur.execute("CREATE TEMPORARY TABLE xst_%s (%s)" % (self.table,coldef),1)
+        for query in queries:
+            self.cur.execute(query)
+        self.columns = self._getColumns()
+        return len(oldcolumns)
+        
+    def execute(self,sql):
+        self.cur.execute(sql)
+            
+    def fetchall(self):
+        trueValues = []
+        for value in self.cur.fetchall():
+            if len(value) > 1:
+                trueValues.append(value)
+            else:
+                trueValues.append(value[0])
+        return trueValues
+       
+    def fetchone(self):
+        one = self.cur.fetchone()
+        if len(one) == 1:
+            return one[0]
+        return one
+    
+    def __contains__(self,steamid):
+        self.execute("SELECT * FROM xst_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        return bool(self.cur.fetchone()) 
+    
+    def query(self,steamid,key):
+        self.execute("SELECT %s FROM xst_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid))
+        return self.fetchone()
+        
+    def convert(self,key,value):
+        if key in self._numericColumns:
+            return value
+        return "'%s'" % value
+        
+    def update(self,steamid,key,newvalue):
+        query = "UPDATE xst_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid)
+        self.execute(query)
+        
+    def increment(self,steamid,key):
+        old = self.query(steamid,key)
+        if not old:
+            old = 0
+        self.execute("UPDATE xst_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid))
+        
+    def add(self,steamid,key,amount):
+        current = self.query(steamid,key)
+        newamount = current + amount
+        self.execute("UPDATE xst_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid))
+        
+    def name(self,steamid,newname):
+        self.execute("SELECT name1,name2,name3,name4,name5 FROM xst_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        cnames = self.fetchone()
+        if not cnames:
+            self.update(steamid,'name1',newname)
+        else:
+            if not type(cnames) == tuple:
+                cnames = [cnames]
+            if newname in cnames:
+                nnames = [newname]
+                for cname in cnames:
+                    if cname == newname:
+                        continue
+                    nnames.append(cname)
+                    if len(nnames) == 5:
+                        break
+            else:
+                nnames = [newname]
+                for cname in cnames:
+                    nnames.append(cname)
+                    if len(nnames) == 5:
+                        break
+            for x in range(len(nnames)):
+                self.update(steamid,'name%s' % (x + 1),nnames[x])
+        self.increment(steamid,'changename') 
+
+    def newplayer(self,steamid):
+        self.execute("INSERT INTO xst_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid))
+        
+    def commit(self):
+        cols = [self.pk]
+        cols += filter(lambda x: x != self.pk, self.columns)
+        self.execute("SELECT %s FROM xst_%s" % (','.join(cols),self.table))
+        return self.fetchall()
+
+class Changes(object): # TEMP table...
+    def __init__(self,table,columns,primary_key):
+        self.con = sqlite3.connect(xspath.joinpath('database.sqlite'))
+        self.con.text_factory = str
+        self.cur = self.con.cursor()
+        self.table = table
+        coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
+        self.execute("CREATE TEMPORARY TABLE xsc_%s (%s)" % (self.table,coldef))
+        self.columns = map(lambda x: x[0],columns)
+        self.pk = primary_key
+        self._numericColumns = filter(lambda x: self._numericColumn(x),self.columns)
+        
+    def _getColumns(self):
+        return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xsc_%s)' % (self.table)).fetchall())
+    
+    def __iter__(self):
+        self.execute("SELECT %s FROM xsc_%s" % (self.pk,self.table))
+    
+    def _numericColumn(self,key):
+        self.execute('PRAGMA table_info(xsc_%s)' % self.table)
+        all = self.fetchall()
+        column = filter(lambda x: x[1] == key,all)[0]
+        return column[2] in ('INTEGER','REAL')
+        
+    def addColumns(self,columns):
+        allcolumns = self._getColumns()
+        for column in filter(lambda x: x[0] not in allcolumns,columns):
+            self.execute("ALTER TABLE xsc_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),1,True)
+        self.columns += map(lambda x: x[0],columns)
+        self._numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
+        
+    def dropColumns(self):
+        oldcolumns = filter(lambda x: x not in self.columns,self._getColumns())
+        if not oldcolumns:
+            return 0
+        self.cur.execute("PRAGMA table_info(xsc_%s)" % self.table)
+        colnames = []
+        coldef = []
+        for row in self.cur.fetchall():
+            if row[1] in oldcolumns:
+                continue
+            colnames.append(row[1])
+            coldef.append('%s %s %s' % (row[1],row[2],'DEFAULT %s' % row[4] if not int(row[5]) == 1 else 'PRIMARY KEY'))
+        coldef =  ', '.join(coldef)
+        self.cur.execute("SELECT %s FROM xsc_%s" % (', '.join(colnames),self.table),2)
+        queries = []
+        for row in self.cur.fetchall():
+            values = []
+            for val in row:
+                if type(val) in (float,int):
+                    values.append(str(val))
+                elif not val:
+                    values.append('NULL')
+                else:
+                    values.append("'%s'" % val)
+            queries.append("INSERT INTO xsc_%s (%s) VALUES (%s)" % (self.table,', '.join(colnames),', '.join(values)),1)
+        self.cur.execute("DROP TEMPORARY TABLE xsc_%s" % self.table,1)
+        self.cur.execute("CREATE TEMPORARY TABLE xsc_%s (%s)" % (self.table,coldef),1)
+        for query in queries:
+            self.cur.execute(query)
+        self.columns = self._getColumns()
+        return len(oldcolumns)
+        
+    def execute(self,sql):
+        self.cur.execute(sql)
+            
+    def fetchall(self):
+        trueValues = []
+        for value in self.cur.fetchall():
+            if len(value) > 1:
+                trueValues.append(value)
+            else:
+                trueValues.append(value[0])
+        return trueValues
+       
+    def fetchone(self):
+        one = self.cur.fetchone()
+        if len(one) == 1:
+            return one[0]
+        return one
+    
+    def __contains__(self,steamid):
+        self.execute("SELECT * FROM xsc_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        return bool(self.cur.fetchone()) 
+    
+    def query(self,steamid,key):
+        self.execute("SELECT %s FROM xsc_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid))
+        return self.fetchone()
+        
+    def convert(self,key,value):
+        if key in self._numericColumns:
+            return value
+        return "'%s'" % value
+        
+    def update(self,steamid,key,newvalue):
+        query = "UPDATE xsc_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid)
+        self.execute(query)
+        
+    def increment(self,steamid,key):
+        old = self.query(steamid,key)
+        if not old:
+            old = 0
+        self.execute("UPDATE xsc_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid))
+        
+    def add(self,steamid,key,amount):
+        current = self.query(steamid,key)
+        newamount = current + amount
+        self.execute("UPDATE xsc_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid))
+        
+    def name(self,steamid,newname):
+        self.execute("SELECT name1,name2,name3,name4,name5 FROM xsc_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        cnames = self.fetchone()
+        if not cnames:
+            self.update(steamid,'name1',newname)
+        else:
+            if not type(cnames) == tuple:
+                cnames = [cnames]
+            if newname in cnames:
+                nnames = [newname]
+                for cname in cnames:
+                    if cname == newname:
+                        continue
+                    nnames.append(cname)
+                    if len(nnames) == 5:
+                        break
+            else:
+                nnames = [newname]
+                for cname in cnames:
+                    nnames.append(cname)
+                    if len(nnames) == 5:
+                        break
+            for x in range(len(nnames)):
+                self.update(steamid,'name%s' % (x + 1),nnames[x])
+        self.increment(steamid,'changename') 
+
+    def newplayer(self,steamid):
+        self.execute("INSERT INTO xsc_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid))
+        
+    def get(self):
+        self.execute("SELECT * FROM xsc_%s" % self.table)
+        all = self.fetchall()
+        self.execute("DELETE FROM xsc_%s" % self.table)
+        return all
+
+class Persistence(object): # Real table...
+    def __init__(self,table,columns,primary_key):
+        self.con = sqlite3.connect(xspath.joinpath('database.sqlite'))
+        self.con.text_factory = str
+        self.cur = self.con.cursor()
+        self.table = table
+        coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
+        self.columns = map(lambda x: x[0],columns)
+        self.execute("CREATE TABLE IF NOT EXISTS xs_%s (%s)" % (self.table,coldef))
+        self.commit()
+        self.pk = primary_key
+        
+    def _getColumns(self):
+        return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xs_%s)' % (self.table)).fetchall())
+        
+    def addColumns(self,columns):
+        allcolumns = self._getColumns()
+        for column in filter(lambda x: x[0] not in allcolumns,columns):
+            self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),1,True)
+        self.columns += map(lambda x: x[0],columns)
+        self._numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
+        
+    def dropColumns(self):
+        oldcolumns = filter(lambda x: x not in self.columns,self._getColumns())
+        if not oldcolumns:
+            return 0
+        self.cur.execute("PRAGMA table_info(xs_%s)" % self.table)
+        colnames = []
+        coldef = []
+        for row in self.cur.fetchall():
+            if row[1] in oldcolumns:
+                continue
+            colnames.append(row[1])
+            coldef.append('%s %s %s' % (row[1],row[2],'DEFAULT %s' % row[4] if not int(row[5]) == 1 else 'PRIMARY KEY'))
+        coldef =  ', '.join(coldef)
+        self.cur.execute("SELECT %s FROM xs_%s" % (', '.join(colnames),self.table),2)
+        queries = []
+        for row in self.cur.fetchall():
+            values = []
+            for val in row:
+                if type(val) in (float,int):
+                    values.append(str(val))
+                elif not val:
+                    values.append('NULL')
+                else:
+                    values.append("'%s'" % val)
+            queries.append("INSERT INTO xs_%s (%s) VALUES (%s)" % (self.table,', '.join(colnames),', '.join(values)),1)
+        self.cur.execute("DROP TABLE xs_%s" % self.table,1)
+        self.commit()
+        self.cur.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),1)
+        self.commit()
+        for query in queries:
+            self.execute(query)
+        self.columns = self._getColumns()
+        return len(oldcolumns)
+        
+    def execute(self,sql):
+        self.cur.execute(sql)
+        self.commit()
+        
+    def __contains__(self,steamid):
+        self.execute("SELECT * FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        return bool(self.cur.fetchone())
+        
+    def convert(self,value):
+        if type(value) in (int,float):
+            return str(value)
+        return "'%s'" % value
+    
+    def update(self,runtime):
+        for player in runtime:
+            if player[0] in self:
+                set = map(lambda x: '%s=%s' % (self.columns[player.index(x)],x),player)
+                self.execute("UPDATE xs_%s SET %s" % (self.table,set))
+            else:
+                self.execute("INSERT INTO xs_%s VALUES (%s)" % (self.table,','.join(map(lambda x: self.convert(x),player))))
+        
+    def commit(self):
+        self.con.commit()
+            
+    def fetchall(self):
+        trueValues = []
+        for value in self.cur.fetchall():
+            if len(value) > 1:
+                trueValues.append(value)
+            else:
+                trueValues.append(value[0])
+        return trueValues
+        
+    def get(self):
+        self.execute("SELECT * FROM xs_%s" % self.table)
+        return self.fetchall()
 
 dod_columns = [
     ('dod_sniper', 'INTEGER DEFAULT 0'),
@@ -1161,11 +1609,11 @@ elif game == 'dod':
     columns += map(lambda x: ('death_%s' % x,'INTEGER DEFAULT 0'),dod_weapons)
     columns += map(lambda x: ('kill_%s' % x,'INTEGER DEFAULT 0'),dod_weapons)
     columns += map(lambda x: ('damage_%s' % x,'REAL DEFAULT 0.0'),dod_weapons)
-players = Sqlite('main',columns)
+players = Database('main',columns)
 tables['main'] = players
 weapons = None
 wcolumns = [('weapon','TEXT PRIMARY KEY'),('kills','INTEGER DEFAULT 0'),('damage','REAL DEFAULT 0.0')]
-weapons = Sqlite('weapons',wcolumns,'weapon')
+weapons = Database('weapons',wcolumns,'weapon')
 if game == 'cstrike':
     for weapon in filter(lambda x: x not in weapons,cstrike_weapons):
         weapons.newplayer(weapon)
