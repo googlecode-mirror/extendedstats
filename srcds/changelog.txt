@@ -1,3 +1,19 @@
+---r137---
+-removed Database, Runtime and Persistence Classes
+-added new Database Class which works as the main database interface
+-added new Table Class which works as a table bound database interface 
+-changed table bound database interface to be created from within Database Class
+
+---r136---
+-added Database Class as new wrapper for the Sqlite3 database
+-added Runtime Class as new wrapper for the runtime table (temp table)
+-added Changes Class as new wrapper for changes table (temp table, for web submission)
+-added Persistence Class as new wrapper for the persistence table
+-added commit for databases to round_end and dod_round_win
+-changed Database.getPlayerList() to __iter__ for more natural iteration over primary keys
+-changed Database interface to be more natural
+-NOTE: Sqlite Class is still present for reference
+
 ---r135---
 -removed BEGIN and COMIT to write-sql
 -added query type check and commit() base on that types
