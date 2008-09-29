@@ -83,11 +83,11 @@ def load():
     loadPackages()
     loadAddons()
     fillDatabase()
+    loadToplist()
     es.regsaycmd(scfg.say_command_prefix + scfg.command_help,'extendedstats/cmd_help')
     es.regclientcmd(scfg.command_help,'extendedstats/cmd_help')
     loadCVARS()
     loadMenus()
-    loadToplist()
     es.regcmd('xs_resetlog','extendedstats/resetlog')
     es.regcmd('xs_cleandb','extendedstats/cleandb')
     es.regcmd('xs_fixtoplist','extendedstats/fixtoplist')
@@ -692,8 +692,7 @@ def round_end(ev):
         players.increment(es.getplayersteamid(userid),'lose')
     dcfg.sync()
     updateTimes()
-    players.commit()
-    weapons.commit()
+    db.commit()
 
 def server_addban(ev):
     if not es.isbot(ev['userid']):
@@ -740,8 +739,7 @@ def dod_round_win(ev):
         players.increment(es.getplayersteamid(userid),'lose')
     dcfg.sync()
     updateTimes()
-    players.commit()
-    weapons.commit()
+    db.commit()
 
 def dod_bomb_exploded(ev):
     if not es.isbot(ev['userid']):
@@ -1098,8 +1096,10 @@ class Database(object):
         self.cur = self.con.cursor()
         
     def newTable(self,tablename,columns,primarykey):
-        table = Table(self.con,self.cur,tablename,columns,primarykey)
-        return table
+        return Table(self.con,self.cur,tablename,columns,primarykey)
+    
+    def commit(self):
+        self.con.commit()
     
 db = Database()
     
