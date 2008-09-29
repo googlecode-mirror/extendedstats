@@ -19,7 +19,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.2.0:137'
+info.version        = '0.2.0:139'
 info.versionstatus  = 'Beta'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -80,6 +80,10 @@ def dbg(text):
 def load():
     dbg( '')
     dbg( 'XS: Loading...')
+    if not callable(getattr(popuplib,'easylist',None)):
+        es.dbgmsg(0,'XS: Popuplib version too old! Please update!')
+        es.unload('extendedstats')
+        return
     loadPackages()
     loadAddons()
     fillDatabase()
@@ -1144,7 +1148,7 @@ class Table(object):
         for column in filter(lambda x: x[0] not in allcolumns,columns):
             self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]))
         self.columns += map(lambda x: x[0],columns)
-        self._numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
+        self._numericColumns = filter(lambda x: self._numericColumn(x),self.columns)
         
     def dropColumns(self):
         oldcolumns = filter(lambda x: x not in self.columns,self._getColumns())
