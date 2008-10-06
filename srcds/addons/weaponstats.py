@@ -61,51 +61,30 @@ def cmd_myweaponstats(userid,args):
     steamid = es.getplayersteamid(userid)
     pplchck('xs_ws_my%s' % userid)
     weapons.execute("SELECT weapon FROM xs_weapons")
-    wwk = []
-    wwd = []
-    wwp = []
-    if EE:
-        wwe = []
-    www = weapons.fetchall()
-    for weapon in www:
-        wwk.append('kill_%s' % weapon)
-        wwd.append('death_%s' % weapon)
-        wwp.append('damage_%s' % weapon)
-        if EE:
-            wwe.append('bought_%s' % weapon)
-    wk = ','.join(wwk)
-    wd = ','.join(wwd)
-    wp = ','.join(wwp)
-    if EE:
-        we = ','.join(wwe)
-    players.execute("SELECT %s FROM xs_main WHERE steamid='%s'" % (wk,steamid))
-    kills = players.fetchone()
-    top = map(lambda x: (wwk[x].split('_')[1],kills[x]),range(len(kills)))
-    top.sort(reverse=True)
-    top = top[0]
-    players.execute("SELECT %s FROM xs_main WHERE steamid='%s'" % (wd,steamid))
-    deaths = players.fetchone()
-    fear = map(lambda x: (wwd[x].split('_')[1],deaths[x]),range(len(deaths)))
-    fear.sort(reverse=True)
-    fear = fear[0]
-    players.execute("SELECT %s FROM xs_main WHERE steamid='%s'" % (wp,steamid))
-    damage = players.fetchone()
-    damage = map(lambda x: (wwp[x].split('_')[1],damage[x]),range(len(damage)))
-    damage.sort(reverse=True)
-    damage = damage[0]
-    if EE:
-        players.execute("SELECT %s FROM xs_main WHERE steamid='%s'" % (we,steamid))
-        exevents = players.fetchone()
-        exevents = map(lambda x: (wwe[x].split('_')[1],exevents[x]),range(len(exevents)))
-        exevents.sort(reverse=True)
-        exevents = exevents[0]
+    weaponnames = weapons.fetchall()
+    # fetch top killer weapon
+    kills = map(lambda x: (players.query(steamid,'kills_%s' % x),x),weaponnames) # get the kills and form a list of tuples: (kills,weaponname)
+    kills.sort(reverse=True) # sort the list, reverse=True because we want the MOST kills
+    killeramount,killername = kills[0] # get the first entry of the list
+    # fetch top death weapon
+    deaths = map(lambda x: (players.query(steamid,'deaths_%s' % x),x),weaponnames) # get the deaths and form a list of tuples: (deaths,weaponname)
+    deaths.sort(reverse=True) # sort the list, reverse=True because we want the MOST deaths
+    deathamount,deathname = deaths[0] # get the first entry of the list
+    # fetch top damage weapon
+    damage = map(lambda x: (players.query(steamid,'damage_%s' % x),x),weaponnames) # get the damage dealt and form a list of tuples: (damage,weaponname)
+    damage.sort(reverse=True) # again reverse for most damage dealt
+    damageamount,damagename = damage[0]
+    if EE: # if EE is available, also check for most bought
+        bought = map(lambda x: (players.query(steamid,'bought_%s' % x),x),weaponnames)
+        bought.sort(reverse=True)
+        boughtamount,boughtname = bought[0]
     p = popuplib.easymenu('xs_ws_my%s' % userid,'_popup_choice',myweaponchoice)
     p.settitle('eXtended Stats - Your Weaponstats')
-    p.addoption(top[0],'Your most lethal weapon: %s with %s kills' % top)
-    p.addoption(damage[0],'Your most damaging weapon: %s with %.1f damage done' % damage)
-    p.addoption(fear[0],'Your most feared weapon: %s, killed you %s times' % fear)
+    p.addoption(top[0],'Your most lethal weapon: %s with %s kills' % (killername,killeramount))
+    p.addoption(damage[0],'Your most damaging weapon: %s with %.1f damage done' % (damagename,damageamount))
+    p.addoption(fear[0],'Your most feared weapon: %s, killed you %s times' % (deathname,deathamount))
     if EE:
-        p.addoption(exevents[0],'Your favorite weapon: %s, bought %s times' % exevents)
+        p.addoption(exevents[0],'Your favorite weapon: %s, bought %s times' % (boughtname,boughtamount))
     p.addoption(1,'Full list of weapons')
     p.send(userid)
     

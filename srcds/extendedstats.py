@@ -2,8 +2,10 @@
 ###        IMPORTS        ####
 ##############################
 
+# ES Imports
 import es, playerlib, vecmath, popuplib, gamethread
-import time, path, sqlite3, sys, traceback, psyco, base64, urllib
+# Python Imports
+import time, path, sqlite3, sys, traceback, psyco, base64, zlib, urllib
 psyco.full()
 
 ##############################
@@ -97,6 +99,7 @@ def load():
     es.regcmd('xs_fixtoplist','extendedstats/fixtoplist')
     es.regcmd('xs_checkversion','extendedstats/checkversion')
     es.regcmd('xs_cfgsync','extendedstast/cfgsync')
+    es.regcmd('xs_fixweaponstats','extendedstats/fixweaponstats')
     dbg('XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
@@ -126,6 +129,12 @@ def fixtoplist():
             toplist.update(steamid,method,methods[method](players,steamid))
     es.dbgmsg(0,'done')
     
+def fixweaponstats():
+    cols = ['kill_world','damage_world','death_world']
+    if addonIsLoaded('extendedevents'):
+        cols.append('bought_wolrd')
+    players.dropColumns(cols)
+    weapons.dropColumns(['world'])
     
 def checkversion():
     esam = urllib.urlopen('http://addons.eventscripts.com/addons/chklatestver/extendedstats')
@@ -324,18 +333,18 @@ def getRank(steamid,method):
 def getRankScore(steamid,method,refresh=False):
     method = getMethod(method)
     if method in players.columns:
-        players.execute("SELECT %s,steamid FROM xs_main ORDER BY %s DESC" % (method,method))
-        allplayers = players.fetchall()
+        score = players.query(steamid,method)
+        players.execute("SELECT steamid FROM xs_main WHERE %s>%s" % (method,score))
+        rank = len(players.fetchall())
     else:
         if refresh:
             for userid in playerlib.getUseridList('#human'):
                 steamid = es.getplayersteamid(userid)
                 toplist.update(steamid,method,methods[method](players,steamid))
-        toplist.execute("SELECT %s,steamid FROM xs_toplist ORDER BY %s DESC" % (method,method))
-        allplayers = toplist.fetchall()
-    index = map(lambda x: x[1],allplayers).index(steamid)
-    return index + 1,allplayers[index][0],len(allplayers)
-    #      RANK      SCORE                PLAYERCOUNT
+        score = toplist.query(steamid,method)
+        toplist.execute("SELECT steamid FROM xs_toplist WHERE %s>%s" % (method,score))
+        rank = len(toplist.fetchall())
+    return rank,score,len(players)
 
 def getToplist(x,method=None):
     method = getMethod(method)
@@ -610,7 +619,7 @@ def player_death(ev):
             players.increment(attackerSteamid,'kills')
     if not victimIsBot:
         dbg( 'weapon stats (death)')
-        if 'kill_%s' % weapon in players.columns:
+        if 'death_%s' % weapon in players.columns:
             players.increment(victimSteamid,'death_%s' % weapon)
         else:
             dbg('Custom weapon, not in database...')
@@ -622,6 +631,23 @@ def player_death(ev):
             dbg('Custom weapon, not in database...')
         if isHeadshot:
             players.increment(attackerSteamid,'headshots')
+
+#    "player_death"        // a game event, name may be 32 charaters long
+#    {
+#        // this extends the original player_death 
+#        "userid"    "short"       // user ID who died                
+#        "attacker"    "short"         // user ID who killed
+#        "weapon"    "string"     // weapon name killer used 
+#        "weaponid"    "short"        // ID of weapon killed used
+#        "damagebits"    "long"        // bits of type of damage
+#        "customkill"    "short"        // type of custom kill
+#        "assister"    "short"        // user ID of assister
+#        "dominated"    "short"        // did killer dominate victim with this kill
+#        "assister_dominated" "short"    // did assister dominate victim with this kill
+#        "revenge"    "short"        // did killer get revenge on victim with this kill
+#        "assister_revenge" "short"    // did assister get revenge on victim with this kill
+#        "weapon_logclassname"    "string"     // weapon name that should be printed on the log
+#    }
     
 def player_falldamage(ev):
     if not es.isbot(ev['userid']):
@@ -676,7 +702,7 @@ def player_team(ev):
             if ot in ['2','3'] and nt in ['1','0']:
                 dbg( 'play to spec')
                 players.add(steamid,'team_%s_time' % ot,time.time() - players.query(steamid,'teamchange_time'))
-                layers.update(steamid,'teamchange_time',time.time())
+                players.update(steamid,'teamchange_time',time.time())
             if ot in ['2','3'] and ot != nt:
                 dbg( 'teamswitch')
                 players.add(steamid,'team_%s_time' % ot,time.time() - players.query(steamid,'teamchange_time'))
@@ -757,18 +783,154 @@ def dod_bomb_defused(ev):
     
 def es_map_start(ev):
     dcfg.sync()
+    
+def object_destroyed(ev):
+    pass         
+    #    "userid"    "short"       // user ID who died                
+    #    "attacker"    "short"         // user ID who killed
+    #    "assister"    "short"        // user ID of assister
+    #    "weapon"    "string"     // weapon name killer used 
+    #    "objecttype"    "short"        // type of object destroyed
+    
 
-### ExtendedEvents ###
-#
-# ExtendedEvents events have been moved to /extendedstats/addons/extendedevents.py
-#       
-### Gungame Events ###
-#
-# Gungame Events have been moved to /extendedstats/addons/gungame.py
-#
-### Warcraft:Source Events ###
-#
-# WCS Events can be found at /extendedstats/addons/wcs.py
+
+def tf_game_over(ev):
+    pass
+    #    "reason"    "string"    // why the game is over ( timelimit, winlimit )
+    
+def ctf_flag_captured(ev):
+    pass
+    #    "capping_team"            "short"
+    #    "capping_team_score"    "short"
+    
+    
+def teamplay_round_win(ev):
+    pass
+    #    "team"        "byte"        // which team won the round
+    #    "winreason"    "byte"        // the reason the team won
+    #    "flagcaplimit"    "short"        // if win reason was flag cap limit, the value of the flag cap limit
+    #    "full_round"    "short"        // was this a full round or a mini-round
+    #    "round_time"    "float"        // elapsed time of this round
+    #    "losing_team_num_caps"    "short"    // # of caps this round by losing team
+    #    "was_sudden_death" "byte"    // did a team win this after entering sudden death
+    
+def teamplay_point_captured(ev):
+    pass
+    #    "cp"        "byte"            // index of the point that was captured
+    #    "cpname"    "string"        // name of the point
+    #    "team"        "byte"            // which team capped
+    #    "cappers"    "string"        // string where each character is a player index of someone that capped
+    
+
+def teamplay_capture_blocked(ev):
+    pass
+    #    "cp"        "byte"            // index of the point that was blocked
+    #    "cpname"    "string"        // name of the point
+    #    "blocker"    "byte"            // index of the player that blocked the cap
+    
+def teamplay_flag_event(ev):
+    pass
+    #    "player"    "short"            // player this event involves
+    #    "eventtype"    "short"            // pick up, capture, defend, dropped
+    
+def teamplay_win_panel(ev):        
+    pass
+    #    "panel_style"        "byte"        // for client to determine layout        
+    #    "winning_team"        "byte"        
+    #    "winreason"        "byte"        // the reason the team won
+    #    "cappers"        "string"    // string where each character is a player index of someone that capped
+    #    "flagcaplimit"        "short"        // if win reason was flag cap limit, the value of the flag cap limit
+    #    "blue_score"        "short"        // red team score
+    #    "red_score"        "short"        // blue team score
+    #    "blue_score_prev"    "short"        // previous red team score
+    #    "red_score_prev"    "short"        // previous blue team score
+    #    "round_complete"    "short"        // is this a complete round, or the end of a mini-round
+    #    "rounds_remaining"    "short"        // # of rounds remaining for wining team, if mini-round
+    #    "player_1"        "short"
+    #    "player_1_points"    "short"
+    #    "player_2"        "short"
+    #    "player_2_points"    "short"
+    #    "player_3"        "short"
+    #    "player_3_points"    "short"
+    
+def localplayer_changedisguise(ev):
+    pass
+    #    "disguised"        "bool"
+    
+def player_builtobject(ev):
+    pass
+    #    "userid"    "short"        // user ID of the spy
+    #    "object"    "byte"
+        
+def player_ignited_inv(ev):#        // sent when a player is ignited by a pyro who is being invulned, only to the medic who's doing the invulning
+    pass
+    #    "pyro_entindex"        "byte"        // entindex of the pyro who ignited the victim
+    #    "victim_entindex"    "byte"        // entindex of the player ignited by the pyro
+    #    "medic_entindex"    "byte"        // entindex of the medic releasing the invuln
+    
+def player_ignited(ev):#            // sent when a player is ignited, only to the two players involved
+    pass
+    #    "pyro_entindex"        "byte"        // entindex of the pyro who ignited the victim
+    #    "victim_entindex"    "byte"        // entindex of the player ignited by the pyro
+    #    "weaponid"            "byte"        // weaponid of the weapon used
+    
+def player_extinguished(ev):#        // sent when a burning player is extinguished by a medic
+    pass
+    #    "userid"    "short"        // userid of the player that was extinguished
+    
+def player_invulned(ev):
+    pass
+    #    "userid"    "short"
+    #    "medic_userid"    "short"
+    
+def player_damaged(ev):
+    pass
+    #    "amount"        "short"
+    #    "type"            "long"
+
+def arena_win_panel(ev):        
+    pass
+    #    "panel_style"        "byte"        // for client to determine layout        
+    #    "winning_team"        "byte"        
+    #    "winreason"        "byte"        // the reason the team won
+    #    "cappers"        "string"    // string where each character is a player index of someone that capped
+    #    "flagcaplimit"        "short"        // if win reason was flag cap limit, the value of the flag cap limit
+    #    "blue_score"        "short"        // red team score
+    #    "red_score"        "short"        // blue team score
+    #    "blue_score_prev"    "short"        // previous red team score
+    #    "red_score_prev"    "short"        // previous blue team score
+    #    "round_complete"    "short"        // is this a complete round, or the end of a mini-round
+    #    "player_1"        "short"
+    #    "player_1_damage"    "short"
+    #    "player_1_healing"    "short"
+    #    "player_1_lifetime"    "short"
+    #    "player_1_kills"    "short"
+    #    "player_2"        "short"
+    #    "player_2_damage"    "short"
+    #    "player_2_healing"    "short"
+    #    "player_2_lifetime"    "short"
+    #    "player_2_kills"    "short"
+    #    "player_3"        "short"
+    #    "player_3_damage"    "short"
+    #    "player_3_healing"    "short"
+    #    "player_3_lifetime"    "short"
+    #    "player_3_kills"    "short"
+    #    "player_4"        "short"
+    #    "player_4_damage"    "short"
+    #    "player_4_healing"    "short"
+    #    "player_4_lifetime"    "short"
+    #    "player_4_kills"    "short"
+    #    "player_5"        "short"
+    #    "player_5_damage"    "short"
+    #    "player_5_healing"    "short"
+    #    "player_5_lifetime"    "short"
+    #    "player_5_kills"    "short"
+    #    "player_6"        "short"
+    #    "player_6_damage"    "short"
+    #    "player_6_healing"    "short"
+    #    "player_6_lifetime"    "short"
+    #    "player_6_kills"    "short"
+
 
 ##############################
 ### DYNAMIC CONFIGURATION  ###
@@ -913,183 +1075,7 @@ default = {
     'debuglevel': '1',
     'statsme_methods': '',
 }
-dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)  
-
-class Sqlite(object):
-    def __init__(self,table,columns=[('steamid','TEXT PRIMARY KEY')],primary_key='steamid'):
-        self.last_query_type = 0 # QUERY TYPES: 0: none, 1: DML, 2: non-DML
-        self.con = sqlite3.connect(xspath.joinpath('database.sqlite'))
-        self.con.text_factory = str
-        self.cur = self.con.cursor()
-        self.table = table
-        self.columns = []
-        self.create(columns)
-        self.columns = map(lambda x: x[0],columns)
-        self.pk = primary_key
-        self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
-        
-    def create(self,columns):
-        self.versioncheck()
-        if self.tableExists():
-            existingColumns = self.getColumns()
-            newcolumns = filter(lambda x: x[0] not in existingColumns,columns)
-            self.addColumns(newcolumns)
-        else:
-            coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
-            self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),True)
-            
-    def versioncheck(self):
-        if info.version == '0.1.1:125':
-            if self.tableExists():
-                if self.table == 'weapons':
-                    if 'steamid' in self.getColumns():
-                        self.execute('DROP TABLE xs_weapons',1,True)
-        
-    def tableExists(self):
-        return len(self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall()) > 0
-        
-    def getColumns(self):
-        return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xs_%s)' % (self.table)).fetchall())
-    
-    def getPlayerList(self):
-        self.execute("SELECT %s FROM xs_%s" % (self.pk,self.table),2)
-        return self.fetchall()
-    
-    def numericColumn(self,key):
-        self.execute('PRAGMA table_info(xs_%s)' % self.table,2)
-        all = self.fetchall()
-        column = filter(lambda x: x[1] == key,all)[0]
-        return column[2] in ('INTEGER','REAL')
-        
-    def addColumns(self,columns):
-        allcolumns = self.getColumns()
-        for column in filter(lambda x: x[0] not in allcolumns,columns):
-            self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]),1,True)
-        self.columns += map(lambda x: x[0],columns)
-        self.numericColumns = filter(lambda x: self.numericColumn(x),self.columns)
-        
-    def dropColumns(self):
-        oldcolumns = filter(lambda x: x not in self.columns,self.getColumns())
-        if not oldcolumns:
-            return 0
-        self.cur.execute("PRAGMA table_info(xs_%s)" % self.table,2)
-        colnames = []
-        coldef = []
-        for row in self.cur.fetchall():
-            if row[1] in oldcolumns:
-                continue
-            colnames.append(row[1])
-            coldef.append('%s %s %s' % (row[1],row[2],'DEFAULT %s' % row[4] if not int(row[5]) == 1 else 'PRIMARY KEY'))
-        coldef =  ', '.join(coldef)
-        self.cur.execute("SELECT %s FROM xs_%s" % (', '.join(colnames),self.table),2)
-        queries = []
-        for row in self.cur.fetchall():
-            values = []
-            for val in row:
-                if type(val) in (float,int):
-                    values.append(str(val))
-                elif not val:
-                    values.append('NULL')
-                else:
-                    values.append("'%s'" % val)
-            queries.append("INSERT INTO xs_%s (%s) VALUES (%s)" % (self.table,', '.join(colnames),', '.join(values)),1)
-        self.cur.execute("DROP TABLE xs_%s" % self.table,1)
-        self.commit()
-        self.cur.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef),1)
-        for query in queries:
-            self.cur.execute(query)
-        self.commit()
-        self.columns = self.getColumns()
-        return len(oldcolumns)
-        
-    def execute(self,sql,query_type,explicit_save=False):
-        if query_type != self.last_query_type:
-            self.commit()
-            self.last_query_type = query_type
-        self.cur.execute(sql)
-        if explicit_save:
-            self.commit()
-            
-    def commit(self):
-        self.con.commit()
-            
-    def fetchall(self):
-        trueValues = []
-        for value in self.cur.fetchall():
-            if len(value) > 1:
-                trueValues.append(value)
-            else:
-                trueValues.append(value[0])
-        return trueValues
-       
-    def fetchone(self):
-        one = self.cur.fetchone()
-        if len(one) == 1:
-            return one[0]
-        return one
-    
-    def __contains__(self,steamid):
-        self.execute("SELECT * FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid),2)
-        return bool(self.cur.fetchone()) 
-    
-    def query(self,steamid,key):
-        self.execute("SELECT %s FROM xs_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid),2)
-        return self.fetchone()
-        
-    def convert(self,key,value):
-        if key in self.numericColumns:
-            return value
-        return "'%s'" % value
-        
-    def update(self,steamid,key,newvalue):
-        #self.execute("BEGIN")
-        query = "UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid)
-        self.execute(query,1)
-        #self.execute("COMMIT")
-        
-    def increment(self,steamid,key):
-        old = self.query(steamid,key)
-        if not old:
-            old = 0
-        #self.execute("BEGIN")
-        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid),1)
-        #self.execute("COMMIT")
-        
-    def add(self,steamid,key,amount):
-        current = self.query(steamid,key)
-        newamount = current + amount
-        #self.execute("BEGIN")
-        self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid),1)
-        #self.execute("COMMIT")
-        
-    def name(self,steamid,newname):
-        self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid),2)
-        cnames = self.fetchone()
-        if not cnames:
-            self.update(steamid,'name1',newname)
-        else:
-            if not type(cnames) == tuple:
-                cnames = [cnames]
-            if newname in cnames:
-                nnames = [newname]
-                for cname in cnames:
-                    if cname == newname:
-                        continue
-                    nnames.append(cname)
-                    if len(nnames) == 5:
-                        break
-            else:
-                nnames = [newname]
-                for cname in cnames:
-                    nnames.append(cname)
-                    if len(nnames) == 5:
-                        break
-            for x in range(len(nnames)):
-                self.update(steamid,'name%s' % (x + 1),nnames[x])
-        self.increment(steamid,'changename') 
-
-    def newplayer(self,steamid):
-        self.execute("INSERT INTO xs_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid),1)
+dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)
         
 ### EXPERIMENTAL NEW SQLITE WRAPPER CLASSES ###
 
@@ -1119,13 +1105,14 @@ class Table(object):
         self._numericColumns = filter(lambda x: self._numericColumn(x),self.columns)    
         
     def _create(self,columns):
+        coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
         if self._tableExists():
             existingColumns = self._getColumns()
             newcolumns = filter(lambda x: x[0] not in existingColumns,columns)
             self.addColumns(newcolumns)
         else:
-            coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
             self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef))
+        self.execute("CREATE TEMP TABLE IF NOT EXISTS xst_%s (%s)" % (self.table,coldef))
             
     def _tableExists(self):
         return len(self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall()) > 0
@@ -1137,6 +1124,10 @@ class Table(object):
         self.execute("SELECT %s FROM xs_%s" % (self.pk,self.table))
         return iter(self.fetchall())
     
+    def __len__(self):
+        self.execute("SELECT %s FROM xs_%s" % (self.pk,self.table))
+        return len(self.fetchall())
+    
     def _numericColumn(self,key):
         self.execute('PRAGMA table_info(xs_%s)' % self.table)
         all = self.fetchall()
@@ -1147,6 +1138,7 @@ class Table(object):
         allcolumns = self._getColumns()
         for column in filter(lambda x: x[0] not in allcolumns,columns):
             self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]))
+            self.exceute("ALTER TABLE xst_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]))
         self.columns += map(lambda x: x[0],columns)
         self._numericColumns = filter(lambda x: self._numericColumn(x),self.columns)
         
@@ -1216,17 +1208,20 @@ class Table(object):
     def update(self,steamid,key,newvalue):
         query = "UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,self.convert(key,newvalue),self.pk,steamid)
         self.execute(query)
+        self._update(steamid,key,newvalue)
         
     def increment(self,steamid,key):
         old = self.query(steamid,key)
         if not old:
             old = 0
         self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid))
+        self._increment(steamid,key)
         
     def add(self,steamid,key,amount):
         current = self.query(steamid,key)
         newamount = current + amount
         self.execute("UPDATE xs_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid))
+        self._add(steamid,key,amount)
         
     def name(self,steamid,newname):
         self.execute("SELECT name1,name2,name3,name4,name5 FROM xs_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
@@ -1252,13 +1247,84 @@ class Table(object):
                         break
             for x in range(len(nnames)):
                 self.update(steamid,'name%s' % (x + 1),nnames[x])
-        self.increment(steamid,'changename') 
+        self.increment(steamid,'changename')
+        self._name(steamid,newname)
 
     def newplayer(self,steamid):
         self.execute("INSERT INTO xs_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid))
         
     def commit(self):
         self.con.commit()
+        
+    def _update(self,steamid,key,value):
+        if not self._contains(steamid):
+            self._newplayer(steamid)
+        self.execute("UPDATE xst_%s SET %s=%s WHERE %s='%s'"  % (self.table,key,self.convert(key,newvalue),self.pk,steamid))
+        
+    def _query(self,steamid,key):
+        self.execute("SELECT %s FROM xst_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid))
+        return self.fetchone()
+    
+    def _increment(self,steamid,key):
+        if not self._contains(steamid):
+            self._newplayer(steamid)
+        old = self._query(steamid,key)
+        if not old:
+            old = 0
+        self.execute("UPDATE xst_%s SET %s=%s WHERE %s='%s'" % (self.table,key,old + 1,self.pk,steamid))
+    
+    def _add(self,steamid,key,amount):
+        if not self._contains(steamid):
+            self._newplayer(steamid)
+        current = self._query(steamid,key)
+        newamount = current + amount
+        self.execute("UPDATE xst_%s SET %s=%s WHERE %s='%s'" % (self.table,key,newamount,self.pk,steamid))
+    
+    def _name(self,steamid,newname):
+        if not self._contains(steamid):
+            self._newplayer(steamid)
+        self.execute("SELECT name1,name2,name3,name4,name5 FROM xst_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        cnames = self.fetchone()
+        if not cnames:
+            self._update(steamid,'name1',newname)
+        else:
+            if not type(cnames) == tuple:
+                cnames = [cnames]
+            if newname in cnames:
+                nnames = [newname]
+                for cname in cnames:
+                    if cname == newname:
+                        continue
+                    nnames.append(cname)
+                    if len(nnames) == 5:
+                        break
+            else:
+                nnames = [newname]
+                for cname in cnames:
+                    nnames.append(cname)
+                    if len(nnames) == 5:
+                        break
+            for x in range(len(nnames)):
+                self._update(steamid,'name%s' % (x + 1),nnames[x])
+        self._increment(steamid,'changename')
+    
+    def _newplayer(self,steamid):
+        self.execute("INSERT INTO xst_%s (%s) VALUES ('%s')" % (self.table,self.pk,steamid))
+    
+    def _contains(self,steamid):
+        self.execute("SELECT * FROM xst_%s WHERE %s='%s'" % (self.table,self.pk,steamid))
+        return bool(self.cur.fetchone())
+    
+    def __getColumns(self):
+        return map(lambda x: x[1], self.con.execute('PRAGMA table_info(xst_%s)' % (self.table)).fetchall())
+    
+    def getchanges(self):
+        columns = self.__getColumns()
+        self.execute("SELECT * FROM xst_%s" % self.table)
+        data = self.fetchall()
+        self.execute("DELETE FROM xst_%s" % self.table)
+        return (columns,data)
+            
 
 dod_columns = [
     ('dod_sniper', 'INTEGER DEFAULT 0'),
@@ -1323,8 +1389,8 @@ columns = [
     ('settings_name','TEXT DEFAULT NULL'),
     ('settings_method','TEXT DEFAULT NULL'),
 ]
-dod_weapons = ['world','punch','30cal', 'amerknife', 'bar', 'bazooka', 'c96', 'colt', 'frag_us','frag_ger', 'garand', 'riflegren_us', 'riflegren_ger', 'k98', 'k98_scoped', 'm1carbine', 'mg42', 'mp40', 'mp44', 'p38', 'pschreck', 'spade', 'spring', 'stick', 'thompson']
-cstrike_weapons = ['world','glock', 'usp', 'p228', 'deagle', 'fiveseven', 'elite', 'm3', 'xm1014', 'tmp', 'mac10', 'mp5navy', 'ump45', 'p90', 'famas', 'galil', 'ak47', 'scout', 'm4a1', 'sg550', 'g3sg1', 'awp', 'sg552', 'aug', 'm249', 'hegrenade', 'flashbang', 'smokegrenade', 'knife', 'c4']
+dod_weapons = ['punch','30cal', 'amerknife', 'bar', 'bazooka', 'c96', 'colt', 'frag_us','frag_ger', 'garand', 'riflegren_us', 'riflegren_ger', 'k98', 'k98_scoped', 'm1carbine', 'mg42', 'mp40', 'mp44', 'p38', 'pschreck', 'spade', 'spring', 'stick', 'thompson']
+cstrike_weapons = ['glock', 'usp', 'p228', 'deagle', 'fiveseven', 'elite', 'm3', 'xm1014', 'tmp', 'mac10', 'mp5navy', 'ump45', 'p90', 'famas', 'galil', 'ak47', 'scout', 'm4a1', 'sg550', 'g3sg1', 'awp', 'sg552', 'aug', 'm249', 'hegrenade', 'flashbang', 'smokegrenade', 'knife', 'c4']
 if game == 'cstrike':
     columns += cstrike_columns
     columns += map(lambda x: ('death_%s' % x,'INTEGER DEFAULT 0'),cstrike_weapons)

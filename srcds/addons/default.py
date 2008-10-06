@@ -105,42 +105,38 @@ def cmd_statsme(userid,args):
         return
     steamid = es.getplayersteamid(userid)
     methods_used = [extendedstats.dcfg['default_method']]
-    top = None
-    low = None
-    tr = 0
-    ts = 0
+    toprank = None
+    lowrank = None
     refresh = True
     for method in extendedstats.methods:
-        r,s,a = extendedstats.getRankScore(steamid,method,refresh)
-        if refresh:
-            refresh = False
-        tr += r
-        ts += s
-        if not top or r > top:
-            top = (r,nice(s),method)
-        if not low or r < low:
-            low = (r,nice(s),method)
-    dr,ds, total = extendedstats.getRankScore(steamid,extendedstats.getMethod())
-    pr, ps = None, None
+        rank,score,allplayers = extendedstats.getRankScore(steamid,method,refresh)
+        refresh = False
+        # if toprank is None OR rank is smaller (smaller number = higher rank) than toprank
+        if not toprank or rank < toprank[0]:
+            toprank = (rank,nice(score),method)
+        if not lowrank or rank > lowrank[0]:
+            lowrank = (rank,nice(score),method)
+    defaultrank,defaultscore,allplayers = extendedstats.getRankScore(steamid,extendedstats.getMethod())
+    personalrank,personalescore = None,None
     settings_method = extendedstats.players.query(steamid,'settings_method')
     if settings_method in extendedstats.methods.keys() and settings_method not in methods_used:
-        pr,ps,pa = extendedstats.getRankScore(steamid,settings_method)
+        personalrank,personalescore,allplayers = extendedstats.getRankScore(steamid,settings_method)
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
     statshim.settitle('Your stats:')
-    statshim.additem('%s: %s of %s with %s' % (extendedstats.dcfg['default_method'],suffix(dr),total,nice(ds)))
+    statshim.additem('%s: %s of %s with %s' % (extendedstats.dcfg['default_method'],suffix(defaultrank),allplayers,nice(defaultscore)))
     if pr:
-        statshim.additem('%s: %s of %s with %s' % (settings_method,suffix(pr),total,nice(ps)))
-    statshim.additem('Top rank: %s of %s with %s using %s' % (suffix(top[0]),total,top[1],top[2]))
-    statshim.additem('Low rank: %s of %s with %s using %s' % (suffix(low[0]),total,low[1],low[2]))
+        statshim.additem('%s: %s of %s with %s' % (settings_method,suffix(personalrank),allplayers,nice(personalscore)))
+    statshim.additem('Top rank: %s of %s with %s using %s' % (suffix(toprank[0]),allplayers,toprank[1],toprank[2]))
+    statshim.additem('Low rank: %s of %s with %s using %s' % (suffix(lowrank[0]),allplayers,lowrank[1],lowrank[2]))
     if bool(extendedstats.dcfg['statsme_methods']):
         mlist = extendedstats.dcfg.as_list('statsme_methods')
-        for method in filter(lambda x: x in extendedstats.methods or x in extendedstats.players.columns,mlist):
+        for method in filter(lambda x: (x in extendedstats.methods or x in extendedstats.players.columns) and x not in methods_used,mlist):
             methods_used.append(method)
-            r,s,a = extendedstats.getRankScore(steamid,method)
-            rank = suffix(r)
-            score = nice(s)
-            statshim.additem('%s: %s of %s with %s' % (method,rank,total,score))
+            rank,score,allplayers = extendedstats.getRankScore(steamid,method)
+            rank = suffix(rank)
+            score = nice(score)
+            statshim.additem('%s: %s of %s with %s' % (method,rank,allplayers,score))
     statshim.send(userid)
     
 def cmd_methods(userid,args):
