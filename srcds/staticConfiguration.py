@@ -40,6 +40,8 @@ settings_menu_resend = True # BOOLEAN
 
 default_top_x = 5 # INTEGER
 
+negative_columns = ['deaths','teamkills','hurt_damage','lose','ban'] # Columns which should be threated negatively in direct calculation
+
 ### Debugging ###
 
 debug = True # highly recommended until final release

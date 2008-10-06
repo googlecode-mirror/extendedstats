@@ -60,14 +60,14 @@ def weaponstats(userid,choice,popupid):
 def cmd_myweaponstats(userid,args):
     steamid = es.getplayersteamid(userid)
     pplchck('xs_ws_my%s' % userid)
-    weapons.execute("SELECT weapon FROM xs_weapons")
+    weapons.execute("SELECT weapon FROM xs_weapons WHERE weapon!='world'")
     weaponnames = weapons.fetchall()
     # fetch top killer weapon
-    kills = map(lambda x: (players.query(steamid,'kills_%s' % x),x),weaponnames) # get the kills and form a list of tuples: (kills,weaponname)
+    kills = map(lambda x: (players.query(steamid,'kill_%s' % x),x),weaponnames) # get the kills and form a list of tuples: (kills,weaponname)
     kills.sort(reverse=True) # sort the list, reverse=True because we want the MOST kills
     killeramount,killername = kills[0] # get the first entry of the list
     # fetch top death weapon
-    deaths = map(lambda x: (players.query(steamid,'deaths_%s' % x),x),weaponnames) # get the deaths and form a list of tuples: (deaths,weaponname)
+    deaths = map(lambda x: (players.query(steamid,'death_%s' % x),x),weaponnames) # get the deaths and form a list of tuples: (deaths,weaponname)
     deaths.sort(reverse=True) # sort the list, reverse=True because we want the MOST deaths
     deathamount,deathname = deaths[0] # get the first entry of the list
     # fetch top damage weapon

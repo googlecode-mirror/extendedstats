@@ -21,7 +21,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.2.0:139'
+info.version        = '0.2.0:141'
 info.versionstatus  = 'Beta'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -99,7 +99,6 @@ def load():
     es.regcmd('xs_fixtoplist','extendedstats/fixtoplist')
     es.regcmd('xs_checkversion','extendedstats/checkversion')
     es.regcmd('xs_cfgsync','extendedstast/cfgsync')
-    es.regcmd('xs_fixweaponstats','extendedstats/fixweaponstats')
     dbg('XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
@@ -128,13 +127,6 @@ def fixtoplist():
         for method in methods.keys():
             toplist.update(steamid,method,methods[method](players,steamid))
     es.dbgmsg(0,'done')
-    
-def fixweaponstats():
-    cols = ['kill_world','damage_world','death_world']
-    if addonIsLoaded('extendedevents'):
-        cols.append('bought_wolrd')
-    players.dropColumns(cols)
-    weapons.dropColumns(['world'])
     
 def checkversion():
     esam = urllib.urlopen('http://addons.eventscripts.com/addons/chklatestver/extendedstats')
@@ -308,7 +300,10 @@ def addHelp(command,helptext):
     
 def getScore(steamid,method):
     if method in players.columns:
-        return players.query(steamid,method)
+        score = players.query(steamid,method)
+        if method in scfg.negative_columns:
+            return -score
+        return score
     if method not in methods:
         method = dcfg['default_method'].strip()
     steamidlist = map(lambda x: es.getplayersteamid(x),playerlib.getUseridList('#human'))
@@ -319,7 +314,10 @@ def getScore(steamid,method):
 def getRank(steamid,method):
     method = getMethod(method)
     if method in players.columns:
-        players.execute("SELECT steamid FROM xs_main ORDER BY %s DESC" % (method))
+        direction = 'DESC'
+        if method in scfg.negative_columns:
+            direction = 'ASC'
+        players.execute("SELECT steamid FROM xs_main ORDER BY %s %s" % (method,direction))
         allplayers = players.fetchall()
         return allplayers.index(steamid) + 1,len(allplayers)
     else:
@@ -334,8 +332,11 @@ def getRankScore(steamid,method,refresh=False):
     method = getMethod(method)
     if method in players.columns:
         score = players.query(steamid,method)
-        players.execute("SELECT steamid FROM xs_main WHERE %s>%s" % (method,score))
-        rank = len(players.fetchall())
+        direction = '>'
+        if method in scfg.negative_columns:
+            direction = '<'
+        players.execute("SELECT steamid FROM xs_main WHERE %s%s%s" % (method,direction,score))
+        rank = len(players.fetchall()) + 1
     else:
         if refresh:
             for userid in playerlib.getUseridList('#human'):
@@ -343,7 +344,7 @@ def getRankScore(steamid,method,refresh=False):
                 toplist.update(steamid,method,methods[method](players,steamid))
         score = toplist.query(steamid,method)
         toplist.execute("SELECT steamid FROM xs_toplist WHERE %s>%s" % (method,score))
-        rank = len(toplist.fetchall())
+        rank = len(toplist.fetchall()) + 1
     return rank,score,len(players)
 
 def getToplist(x,method=None):
@@ -1097,22 +1098,23 @@ class Table(object):
     def __init__(self,con,cur,tablename,columns,primarykey):
         self.con = con
         self.cur = cur
+        self.pk = primarykey
         self.table = tablename
         self.columns = []
         self._create(columns)
         self.columns = map(lambda x: x[0],columns)
-        self.pk = primarykey
         self._numericColumns = filter(lambda x: self._numericColumn(x),self.columns)    
         
     def _create(self,columns):
-        coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
         if self._tableExists():
             existingColumns = self._getColumns()
+            self.execute("CREATE TEMP TABLE IF NOT EXISTS xst_%s (%s TEXT PRIMARY KEY)" % (self.table,self.pk))
             newcolumns = filter(lambda x: x[0] not in existingColumns,columns)
             self.addColumns(newcolumns)
         else:
+            coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
             self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef))
-        self.execute("CREATE TEMP TABLE IF NOT EXISTS xst_%s (%s)" % (self.table,coldef))
+            self.execute("CREATE TEMP TABLE IF NOT EXISTS xst_%s (%s)" % (self.table,coldef))
             
     def _tableExists(self):
         return len(self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall()) > 0
@@ -1138,7 +1140,7 @@ class Table(object):
         allcolumns = self._getColumns()
         for column in filter(lambda x: x[0] not in allcolumns,columns):
             self.execute("ALTER TABLE xs_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]))
-            self.exceute("ALTER TABLE xst_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]))
+            self.execute("ALTER TABLE xst_%s ADD COLUMN %s %s" % (self.table,column[0],column[1]))
         self.columns += map(lambda x: x[0],columns)
         self._numericColumns = filter(lambda x: self._numericColumn(x),self.columns)
         
@@ -1146,6 +1148,7 @@ class Table(object):
         oldcolumns = filter(lambda x: x not in self.columns,self._getColumns())
         if not oldcolumns:
             return 0
+
         self.cur.execute("PRAGMA table_info(xs_%s)" % self.table)
         colnames = []
         coldef = []
@@ -1256,7 +1259,7 @@ class Table(object):
     def commit(self):
         self.con.commit()
         
-    def _update(self,steamid,key,value):
+    def _update(self,steamid,key,newvalue):
         if not self._contains(steamid):
             self._newplayer(steamid)
         self.execute("UPDATE xst_%s SET %s=%s WHERE %s='%s'"  % (self.table,key,self.convert(key,newvalue),self.pk,steamid))
@@ -1389,8 +1392,8 @@ columns = [
     ('settings_name','TEXT DEFAULT NULL'),
     ('settings_method','TEXT DEFAULT NULL'),
 ]
-dod_weapons = ['punch','30cal', 'amerknife', 'bar', 'bazooka', 'c96', 'colt', 'frag_us','frag_ger', 'garand', 'riflegren_us', 'riflegren_ger', 'k98', 'k98_scoped', 'm1carbine', 'mg42', 'mp40', 'mp44', 'p38', 'pschreck', 'spade', 'spring', 'stick', 'thompson']
-cstrike_weapons = ['glock', 'usp', 'p228', 'deagle', 'fiveseven', 'elite', 'm3', 'xm1014', 'tmp', 'mac10', 'mp5navy', 'ump45', 'p90', 'famas', 'galil', 'ak47', 'scout', 'm4a1', 'sg550', 'g3sg1', 'awp', 'sg552', 'aug', 'm249', 'hegrenade', 'flashbang', 'smokegrenade', 'knife', 'c4']
+dod_weapons = ['world','punch','30cal', 'amerknife', 'bar', 'bazooka', 'c96', 'colt', 'frag_us','frag_ger', 'garand', 'riflegren_us', 'riflegren_ger', 'k98', 'k98_scoped', 'm1carbine', 'mg42', 'mp40', 'mp44', 'p38', 'pschreck', 'spade', 'spring', 'stick', 'thompson']
+cstrike_weapons = ['world','glock', 'usp', 'p228', 'deagle', 'fiveseven', 'elite', 'm3', 'xm1014', 'tmp', 'mac10', 'mp5navy', 'ump45', 'p90', 'famas', 'galil', 'ak47', 'scout', 'm4a1', 'sg550', 'g3sg1', 'awp', 'sg552', 'aug', 'm249', 'hegrenade', 'flashbang', 'smokegrenade', 'knife', 'c4']
 if game == 'cstrike':
     columns += cstrike_columns
     columns += map(lambda x: ('death_%s' % x,'INTEGER DEFAULT 0'),cstrike_weapons)

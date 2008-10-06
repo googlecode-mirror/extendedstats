@@ -125,7 +125,7 @@ def cmd_statsme(userid,args):
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
     statshim.settitle('Your stats:')
     statshim.additem('%s: %s of %s with %s' % (extendedstats.dcfg['default_method'],suffix(defaultrank),allplayers,nice(defaultscore)))
-    if pr:
+    if personalrank:
         statshim.additem('%s: %s of %s with %s' % (settings_method,suffix(personalrank),allplayers,nice(personalscore)))
     statshim.additem('Top rank: %s of %s with %s using %s' % (suffix(toprank[0]),allplayers,toprank[1],toprank[2]))
     statshim.additem('Low rank: %s of %s with %s using %s' % (suffix(lowrank[0]),allplayers,lowrank[1],lowrank[2]))
