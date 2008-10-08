@@ -116,6 +116,8 @@ def cmd_statsme(userid,args):
             toprank = (rank,nice(score),method)
         if not lowrank or rank > lowrank[0]:
             lowrank = (rank,nice(score),method)
+    methods_used.append(toprank[2])
+    methods_used.append(lowrank[2])
     defaultrank,defaultscore,allplayers = extendedstats.getRankScore(steamid,extendedstats.getMethod())
     personalrank,personalescore = None,None
     settings_method = extendedstats.players.query(steamid,'settings_method')

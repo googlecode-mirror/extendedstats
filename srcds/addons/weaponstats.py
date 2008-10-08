@@ -80,11 +80,11 @@ def cmd_myweaponstats(userid,args):
         boughtamount,boughtname = bought[0]
     p = popuplib.easymenu('xs_ws_my%s' % userid,'_popup_choice',myweaponchoice)
     p.settitle('eXtended Stats - Your Weaponstats')
-    p.addoption(top[0],'Your most lethal weapon: %s with %s kills' % (killername,killeramount))
-    p.addoption(damage[0],'Your most damaging weapon: %s with %.1f damage done' % (damagename,damageamount))
-    p.addoption(fear[0],'Your most feared weapon: %s, killed you %s times' % (deathname,deathamount))
+    p.addoption(killername,'Your most lethal weapon: %s with %s kills' % (killername,killeramount))
+    p.addoption(damagename,'Your most damaging weapon: %s with %.1f damage done' % (damagename,damageamount))
+    p.addoption(deathname,'Your most feared weapon: %s, killed you %s times' % (deathname,deathamount))
     if EE:
-        p.addoption(exevents[0],'Your favorite weapon: %s, bought %s times' % (boughtname,boughtamount))
+        p.addoption(boughtname,'Your favorite weapon: %s, bought %s times' % (boughtname,boughtamount))
     p.addoption(1,'Full list of weapons')
     p.send(userid)
     
