@@ -1106,15 +1106,14 @@ class Table(object):
         self._numericColumns = filter(lambda x: self._numericColumn(x),self.columns)    
         
     def _create(self,columns):
+        coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
         if self._tableExists():
             existingColumns = self._getColumns()
-            self.execute("CREATE TEMP TABLE IF NOT EXISTS xst_%s (%s TEXT PRIMARY KEY)" % (self.table,self.pk))
             newcolumns = filter(lambda x: x[0] not in existingColumns,columns)
             self.addColumns(newcolumns)
         else:
-            coldef = ', '.join(map(lambda x: '%s %s' % x,columns))
             self.execute("CREATE TABLE xs_%s (%s)" % (self.table,coldef))
-            self.execute("CREATE TEMP TABLE IF NOT EXISTS xst_%s (%s)" % (self.table,coldef))
+        self.execute("CREATE TEMP TABLE IF NOT EXISTS xst_%s (%s)" % (self.table,coldef))
             
     def _tableExists(self):
         return len(self.con.execute('PRAGMA table_info(xs_%s)' % self.table).fetchall()) > 0
