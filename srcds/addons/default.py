@@ -118,11 +118,15 @@ def cmd_statsme(userid,args):
             lowrank = (rank,nice(score),method)
     methods_used.append(toprank[2])
     methods_used.append(lowrank[2])
-    defaultrank,defaultscore,allplayers = extendedstats.getRankScore(steamid,extendedstats.getMethod())
+    defaultmethod = extendedstats.getMethod()
+    if not defaultmethod in methods_used:
+        defaultrank,defaultscore,allplayers = extendedstats.getRankScore(steamid,defaultmethod)
+        methods_used.append(default_method)
     personalrank,personalescore = None,None
     settings_method = extendedstats.players.query(steamid,'settings_method')
     if settings_method in extendedstats.methods.keys() and settings_method not in methods_used:
         personalrank,personalescore,allplayers = extendedstats.getRankScore(steamid,settings_method)
+        methods_used.append(settings_method)
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
     statshim.settitle('Your stats:')
