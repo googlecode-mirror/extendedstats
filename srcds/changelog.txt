@@ -1,3 +1,58 @@
+---r146---
+-added strings.ini
+-added /games/cstrike/cstrike.py
+-added /games/dod/dod.py
+-added /games/tf/tf.py
+-added TextConverter() class
+-added suffix() function
+-fixed rank in /addons/default.py to use getRankScore() instead of getRank() and getScore()
+-replaced strings in /addons/default.py to use TextConverter() class
+-moved events to /games/cstrike/cstrike.py, /games/dod/dod.py and /games/tf/tf.py
+-removed suffix() from /addons/default.py
+-removed nice() from /addons/default.py
+
+
+---r145---
+-fixed a bug in statsme caused by r144
+
+---r144---
+-changed statsme duplication bug
+
+---r143---
+-fixed Table.create(...) to always create a full temporary table.
+
+---r142---
+-fixed myweaponstats in weaponstats
+-fixed dublicated methods in statsme
+
+---r141---
+-fixed Table.dropColumns(...)
+-fixed Table.addColumns(...)
+-fixed Table._update(...)
+-fixed cmd_statsme(...)
+-removed xs_fixmyweaponstats
+-added scfg.negative_columns
+-added negative column check to getRank, getScore, getRankScore
+-added Table.__len__()
+-added temporary table functions to Table to prepare for webstats
+
+---r140---
+-added first comments for TF2 implemention
+-added command xs_fixweaponstats to remove world
+-improved getRankScore
+-improved/fixed cmd_myweaponstats
+-fixed cmd_rank
+-fixed load issue in weaponstats
+
+---r139---
+-this is 0.2.0:139 beta
+-fixed Table.addColumns
+-added popuplib version control
+
+---r138---
+-fixed weaponstats.py to use new database interface
+-TODO: toplist support for weaponstats.py
+
 ---r137---
 -removed Database, Runtime and Persistence Classes
 -added new Database Class which works as the main database interface
