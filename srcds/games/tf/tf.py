@@ -1,3 +1,5 @@
+from extendedstats.extendedstats import *
+
 def server_cvar(ev):
     if ev['cvarname'] in dcfg.cvars():
         dcfg[ev['cvarname'][3:]] = ev['cvarvalue']

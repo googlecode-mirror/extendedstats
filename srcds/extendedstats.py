@@ -21,7 +21,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.3.0:146'
+info.version        = '0.2.0:146'
 info.versionstatus  = 'Final'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -423,12 +423,12 @@ def suffix(rank):
     rank = str(rank)
     end = rank[-1]
     if end == '1':
-        return rank + 'st'
+        return rank + text.getSimple('suffix','one')
     if end == '2':
-        return rank + 'nd'
+        return rank + text.getSimple('suffix','two')
     if end == '3':
-        return rank + 'rd'
-    return rank + 'th'
+        return rank + text.getSimple('suffix','three')
+    return rank + text.getSimple('suffix','other')
         
     
 ##############################
@@ -489,8 +489,18 @@ class TextConverter(object):
         self.epattern = re.compile('f!\d+')
         self.dpattern = re.compile('f![?]\d+')
         
-    def getString(self,steamid,cmd,method,score,rank,totalplayers):
-        s = self.strings[cmd]
+    def getSimple(self,section,name):
+        return self.strings['general strings'][section][name]
+    
+    def getTokenString(self,section,name,tokens):
+        s = self.strings['general strings'][section][name]
+        for name,value in tokens:
+            pattern = re.compile('([$]%s[$])' % name)
+            s = pattern.sub(value,s)
+        return s
+        
+    def getCmdString(self,steamid,cmd,method,score,rank,totalplayers):
+        s = self.strings['commands'][cmd]
         if not method in s:
             method = '__standard__'
         s = s[method]

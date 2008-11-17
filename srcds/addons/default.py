@@ -30,7 +30,7 @@ def unload():
 
 def cmd_top(userid,args):
     if str(userid) in extendedstats.pending:
-        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        es.tell(userid,txt.getSimple('sorry_pending'))
         return
     myargs = [scfg.default_top_x,None]
     for x in range(len(args)):
@@ -46,7 +46,7 @@ def xs_filter(userid, message, team):
     cmd = tokens[0]
     if cmd.startswith(scfg.say_command_prefix + scfg.command_top) and len(tokens) < 3:
         if str(userid) in xs.pending:
-            es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+            es.tell(userid,txt.getSimple('messages','sorry_pending'))
             return
         settings_method = xs.players.query(es.getplayersteamid(userid),'settings_method')
         default_method = xs.dcfg['default_method']
@@ -71,7 +71,7 @@ def displayTop(userid,x,method):
     toplist.settitle('Top %s (%s):' % (x,method))
     i = 1
     for player in topplayers:
-        toplist.additem(text.getString(player[1],'top',method,player[0],i,totalplayers))
+        toplist.additem(text.getCmdString(player[1],'top',method,player[0],i,totalplayers))
         i += 1
     toplist.send(userid)
     
@@ -80,16 +80,16 @@ def cmd_commands(userid,args):
         popuplib.send('xs_commands_list',userid)
     else:
         c = popuplib.easylist('xs_commands_list')
-        c.settitle('Command list:')
+        c.settitle(text.getSimple('command list','title'))
         for x in xs.reggedccmd:
-            c.additem('%s (console)' % x)
+            c.additem(text.getTokenString('command list','console',[('command',x)]))
         for x in xs.reggedscmd:
-            c.additem('%s (chat)' % x)
+            c.additem(text.getTokenString('command list','chat',[('command',x)]))
         c.send(userid)
     
 def cmd_rank(userid,args):
     if str(userid) in xs.pending:
-        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        es.tell(userid,txt.getSimple('messages','sorry_pending'))
         return
     steamid = es.getplayersteamid(userid)
     if len(args) == 1:
@@ -97,11 +97,11 @@ def cmd_rank(userid,args):
     else:
         method = xs.getMethod(extendedstats.players.query(steamid,'settings_method'))
     rank,score,totalplayers = xs.getRankScore(steamid,method)
-    es.tell(userid,text.getString(steamid,'rank',method,score,rank,totalplayers))
+    es.tell(userid,text.getCmdString(steamid,'rank',method,score,rank,totalplayers))
     
 def cmd_statsme(userid,args):
     if str(userid) in xs.pending:
-        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        es.tell(userid,txt.getSimple('messages','sorry_pending'))
         return
     steamid = es.getplayersteamid(userid)
     methods_used = [xs.dcfg['default_method']]
@@ -130,19 +130,19 @@ def cmd_statsme(userid,args):
         methods_used.append(settings_method)
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
-    statshim.settitle('Your stats:')
+    statshim.settitle(text.getSimple('statsme','title'))
     if defaultrank:
-        statshim.additem(text.getString(steamid,'statsme',xs.dcfg['default_method'],defaultscore,defaultrank,allplayers))
+        statshim.additem(text.getCmdString(steamid,'statsme',xs.dcfg['default_method'],defaultscore,defaultrank,allplayers))
     if personalrank:
-        statshim.additem(text.getString(steamid,'statsme',settings_method,personalscore,personalrank,allplayers))
-    statshim.additem(text.getString(steamid,'statsme_toprank',toprank[2],toprank[1],toprank[0],allplayers))
-    statshim.additem(text.getString(steamid,'statsme_lowrank',lowrank[2],lowrank[1],lowrank[0],allplayers))
+        statshim.additem(text.getCmdString(steamid,'statsme',settings_method,personalscore,personalrank,allplayers))
+    statshim.additem(text.getCmdString(steamid,'statsme_toprank',toprank[2],toprank[1],toprank[0],allplayers))
+    statshim.additem(text.getCmdString(steamid,'statsme_lowrank',lowrank[2],lowrank[1],lowrank[0],allplayers))
     if bool(xs.dcfg['statsme_methods']):
         mlist = xs.dcfg.as_list('statsme_methods')
         for method in filter(lambda x: (x in xs.methods or x in xs.players.columns) and x not in methods_used,mlist):
             methods_used.append(method)
             rank,score,allplayers = xs.getRankScore(steamid,method)
-            statshim.additem(text.getString(steamid,'statsme',method,score,rank,allplayers))
+            statshim.additem(text.getCmdString(steamid,'statsme',method,score,rank,allplayers))
     statshim.send(userid)
     
 def cmd_methods(userid,args):
@@ -150,14 +150,14 @@ def cmd_methods(userid,args):
     
 def cmd_settings(userid,args):
     if str(userid) in xs.pending:
-        es.tell(userid,"Sorry but your Steam ID is currently pending and you may not use this command. Please try again later.")
+        es.tell(userid,txt.getSimple('messages','sorry_pending'))
         return
     pplchck('xs_settings_menu_%s' % userid)
     settingsmenu = popuplib.easymenu('xs_settings_menu_%s' % userid,'_popup_choice',settingsCallback)
-    settingsmenu.settitle('Your eXtended Stats settings: Main')
-    settingsmenu.addoption('method','Choose your personal method')
-    settingsmenu.addoption('name','Choose your preferred name')
-    settingsmenu.addoption('exit','Exit')
+    settingsmenu.settitle(text.getSimple('settings','titel_main'))
+    settingsmenu.addoption('method',text.getSimple('settings','choose_method'))
+    settingsmenu.addoption('name',text.getSimple('settings','choose_name'))
+    settingsmenu.addoption('exit',text.getSimple('settings','exit'))
     settingsmenu.send(userid)
     
 def settingsCallback(userid,choice,name):
@@ -165,20 +165,20 @@ def settingsCallback(userid,choice,name):
     if choice == 'method':
         pplchck('xs_methods_menu_%s' % userid)
         methodmenu = popuplib.easymenu('xs_methods_menu_%s' % userid,'_popup_choice',settingsCallback2)
-        methodmenu.settitle('Your eXtended Stats settings: Method')
+        methodmenu.settitle(text.getSimple('settings','title_method'))
         settings_method = xs.players.query(steamid,'settings_method')
         for method in xs.methods.keys():
             if method == settings_method:
                 methodmenu.addoption(('method',method),'-> %s' % method)
             else:
                 methodmenu.addoption(('method',method),method)
-        methodmenu.addoption(2,'Reset setting')
-        methodmenu.addoption(1,'Back to Main')
+        methodmenu.addoption(2,text.getSimple('settings','reset'))
+        methodmenu.addoption(1,text.getSimple('settings','back'))
         methodmenu.send(userid)
     elif choice == 'name':
         pplchck('xs_name_menu_%s' % userid)
         namemenu = popuplib.easymenu('xs_name_menu_%s' % userid,'_popup_choice',settingsCallback2)
-        namemenu.settitle('Your eXtended Stats settings: Name')
+        namemenu.settitle(text.getSimple('settings','title_name'))
         settings_name = xs.players.query(steamid,'settings_method')
         xs.players.execute("SELECT name1,name2,name3,name4,name5 FROM xs_main WHERE steamid='%s'" % (steamid))
         names = xs.players.fetchone()
@@ -189,8 +189,8 @@ def settingsCallback(userid,choice,name):
                 namemenu.addoption(('name',name),'-> %s' % name)
             else:
                 namemenu.addoption(('name',name),name)      
-        namemenu.addoption(2,'Reset setting')          
-        namemenu.addoption(1,'Back to main')
+        namemenu.addoption(2,text.getSimple('settings','reset'))          
+        namemenu.addoption(1,text.getSimple('settings','back'))
         namemenu.send(userid)
     elif choice == 'exit':
         return
@@ -206,7 +206,7 @@ def settingsCallback2(userid,choice,name):
             xs.players.update(steamid,'settings_name','NULL')
     else:
         xs.players.update(steamid,'settings_%s' % choice[0],choice[1])
-        es.tell(userid,'Your eXtended Stats settings have been changed successfully.')
+        es.tell(userid,text.getSimple('settings','success'))
     if scfg.settings_menu_resend:
         cmd_settings(userid,None)
 

@@ -1,5 +1,4 @@
-from extendedstats import extendedstats
-from extendedstats import *
+from extendedstats.extendedstats import *
 
 def server_cvar(ev):
     if ev['cvarname'] in dcfg.cvars():
