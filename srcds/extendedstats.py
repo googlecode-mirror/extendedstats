@@ -21,7 +21,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.2.0:146'
+info.version        = '0.2.0:147'
 info.versionstatus  = 'Final'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
@@ -100,7 +100,7 @@ def load():
     es.regcmd('xs_fixtoplist','extendedstats/fixtoplist')
     es.regcmd('xs_checkversion','extendedstats/checkversion')
     es.regcmd('xs_cfgsync','extendedstast/cfgsync')
-    es.load('extendedstats/games/%s' % (game))
+    es.server.queuecmd('es_load extendedstats/games/%s' % (game))
     dbg('XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
@@ -135,10 +135,10 @@ def checkversion():
     esamversion = esam.read()
     localversion = info.version.split(':')[0]
     if esamversion != localversion:
-        es.dbgmsg(0,"You're version of eXtended Stats (%s) is outdated. The newest version is %s." % (localversion,esamversion))
-        es.dbgmsg(0,"Please update from http://addons.eventscripts.com/addons/view/extendedstats")
+        es.dbgmsg(0,text.getTokenString('update','newversion',[('newversion',esamversion),('currentversion',localversion)]))
+        es.dbgmsg(0,text.getSimple('update','please_update'))
     else:
-        es.dbgmsg(0,"You're version of eXtended Stats (%s) is up to date." % localversion)
+        es.dbgmsg(0,text.getTokenString('update','no_new',[('currentversion',localversion)]))
         
 def cfgsync():
     dcfg.sync()    
@@ -218,38 +218,21 @@ def loadCVARS():
     
 def loadMenus():
     p = popuplib.easymenu('xs_help_menu','_popup_choice',helpCallback)
-    p.settitle('Helptopics for eXtended Stats:')
-    p.addoption('xs_doc_about','About eXtended Stats')
-    for key in cmdhelp:
+    p.settitle(text.getSimple('helpmenu','title'))
+    p.addoption('xs_doc_about',text.getSimple('helpmenu','about'))
+    pattern = re.compile('__\w*__')
+    doccmds = filter(lambda x: pattern.match(x),text.strings['help'])
+    for key in doccmds:
         p.addoption(key,key)
-    p.addoption('nodoc','Undocumented Commands')
+    p.addoption('nodoc',text.getSimple('helpmenu','nodoc'))
     
-    p = popuplib.easylist('xs_doc_nodoc')
-    p.settitle('Undocumented Commands:')
-    doccmds = cmdhelp.keys()
-    nodocl = filter(lambda x: x not in doccmds,uniquecommands)
-    if nodocl == []:
-        nodocl = ['No undocumented Commands']
-    for x in nodocl:
-        p.additem(x)
+    nodocl = [text.getSimple('helpmenu','nodoc')] + filter(lambda x: x not in doccmds,uniquecommands)
+    p = popuplib.easylist('xs_doc_nodoc', nodocl if len(nodocl) > 1 else [text.getSimple('helpmenu','nodoc'),text.getSimple('help','no_nodoc')])
         
-    p = popuplib.easylist('xs_doc_about')
-    p.settitle('About eXtended Stats %s' % info.version)
-    p.additem("eXtended Stats is an addon for Mattie's EventScripts")
-    p.additem("It was written by Ojii")
-    p.additem(" ")
-    p.additem("If you want this addon on your server or want to learn more visit:")
-    p.additem("http://extendedstats.ojii.ch")
-    p.additem(" ")
-    p.additem("If you find bugs or other issues please report them on:")
-    p.additem("http://code.google.com/p/extendedstats/issues/list")
-    p.additem("->1: Exit")
+    p = popuplib.easylist('xs_doc_about',text.getHelp('__about__'))
     
-    for command in cmdhelp:
-        p = popuplib.easylist('xs_doc_%s' % command)
-        p.settitle('Help: %s' % command)
-        for x in cmdhelp[command]:
-            p.additem(x)
+    for command in text.strings['help']:
+        p = popuplib.easylist('xs_doc_%s' % command,text.strings['help'][command])
             
 def loadToplist():
     global toplist
@@ -275,12 +258,9 @@ def registerEvent(name,event,callback): # string,string,method
     es.addons.registerForEvent(__import__('extendedstats.addons.%s' % name), event, callback)
     dbg( 'XS: Registered event %s for %s' % (event, name))
     
-def registerCommand(command,addonname,callback,clientcommand=True,saycommand=True,helplist=['No help available for this command']):
+def registerCommand(command,addonname,callback,clientcommand=True,saycommand=True):
     global addoncommands, reggedccmd, reggedscmd, cmdhelp, uniquecommands
     uniquecommands.append(command)
-    if type(helplist) == str:
-        helplist = makeList(helplist)
-    cmdhelp[command] = helplist
     if clientcommand:
         es.regclientcmd(command,'extendedstats/addonCommandListener')
         addoncommands[command] = callback
@@ -292,13 +272,6 @@ def registerCommand(command,addonname,callback,clientcommand=True,saycommand=Tru
         addoncommands[command] = callback
         reggedscmd.append(command)
         dbg( 'XS: Registered saycommand %s for %s' % (command,addonname))
-        
-def addHelp(command,helptext):
-    global cmdhelp
-    if not type(helptext) == list:
-        helptext = makeList(helptext)
-    cmdhelp[command] = helptext
-    dbg( 'XS: Added help text for %s' % command)
     
 def getScore(steamid,method):
     if method in players.columns:
@@ -475,7 +448,7 @@ def pendingCheck(userid):
 ###         EVENTS         ###
 ##############################
 
-# Events have been moved to ./games/gamename/gamename.py
+# moved to /games/
 
 ##############################
 ###    TEXT  CONVERSION    ###
@@ -498,6 +471,21 @@ class TextConverter(object):
             pattern = re.compile('([$]%s[$])' % name)
             s = pattern.sub(value,s)
         return s
+    
+    def getHelp(self,command,tokens=[]):
+        l = self.strings['help'][command]
+        if not type(l) == list:
+            l = [l]
+        if tokens:
+            ll = []
+            for s in l:
+                for name,value in tokens:
+                    pattern = re.compile('([$]%s[$])' % name)
+                    s = pattern.sub(value,s)
+                ll.append(s)
+            return ll
+        return l
+        
         
     def getCmdString(self,steamid,cmd,method,score,rank,totalplayers):
         s = self.strings['commands'][cmd]

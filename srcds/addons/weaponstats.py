@@ -8,8 +8,8 @@ scfg = xs.scfg
 EE = xs.addonIsLoaded('extendedevents')
 
 def load():
-    xs.registerCommand(scfg.command_weaponstats_weaponstats,'weaponstats',cmd_weaponstats,True,True,helplist=['Detailed stats about weapons'])
-    xs.registerCommand(scfg.command_weaponstats_myweaponstats,'weaponstats',cmd_myweaponstats,True,True,helplist=['Detailed stats about a players weapon usage'])
+    xs.registerCommand(scfg.command_weaponstats_weaponstats,'weaponstats',cmd_weaponstats,True,True)
+    xs.registerCommand(scfg.command_weaponstats_myweaponstats,'weaponstats',cmd_myweaponstats,True,True)
     pplchck('xs_ws_list')
     p = popuplib.easymenu('xs_ws_list','_popup_choice',weaponstats)
     pp = popuplib.easymenu('xs_ws_mylist','_popup_choice',myweaponstats)

@@ -1,4 +1,16 @@
-from extendedstats.extendedstats import *
+from extendedstats.extendedstats import \
+dcfg,\
+newconnected,\
+dbg,pending,\
+players,\
+weapons,\
+sid,\
+updateTimes,\
+db
+import es, time, gamethread, vecmath
+
+def load():
+    dbg('XS: loading dod events...')
 
 def server_cvar(ev):
     if ev['cvarname'] in dcfg.cvars():

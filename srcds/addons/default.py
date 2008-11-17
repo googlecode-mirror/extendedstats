@@ -6,24 +6,18 @@ scfg = xs.scfg
 text = xs.text
 
 def load():
-    xs.registerCommand(scfg.command_rank,'default',cmd_rank,helplist=['Usage: !rank [method]','method is optional.','To get a list of methods use !methods'])
-    xs.registerCommand(scfg.command_statsme,'default',cmd_statsme,helplist=['Usage: !statsme [method]',' method is optional.','To get a list of methods use !methods'])
-    xs.registerCommand(scfg.command_methods,'default',cmd_methods,helplist=['Usage: !methods','Will show a list of available methods'])
-    xs.registerCommand(scfg.command_settings,'default',cmd_settings,helplist=['Usage: !settings','Will open a menu to change personal settings'])
-    xs.registerCommand(scfg.command_top,'default',cmd_top,True,False,['Usage: topX [method].','X should be an integer.','method is optional.','To get a list of methods use !methods'])
-    xs.registerCommand(scfg.command_commands,'default',cmd_commands,helplist=['Shows a list of commands'])
-    xs.addHelp(scfg.command_top,'Usage: topX [method]. X should be an integer. method is optional. To get a list of methods use !methods')
+    xs.registerCommand(scfg.command_rank,'default',cmd_rank)
+    xs.registerCommand(scfg.command_statsme,'default',cmd_statsme)
+    xs.registerCommand(scfg.command_methods,'default',cmd_methods)
+    xs.registerCommand(scfg.command_settings,'default',cmd_settings)
+    xs.registerCommand(scfg.command_top,'default',cmd_top,True,False)
+    xs.registerCommand(scfg.command_commands,'default',cmd_commands)
     es.addons.registerSayFilter(xs_filter)
     menus()
     
 def menus():
     pplchck('xs_methods_list')
-    methodslist = ['Methods available:']
-    methodslist += xs.methods.keys()
-    m = popuplib.easylist('xs_methods_list')
-    m.settitle('Methods List:')
-    for x in methodslist:
-        m.additem(x)
+    m = popuplib.easylist('xs_methods_list',[text.getSimple('methodslist','title')] + xs.methods.keys())
     
 def unload():
     es.addons.unregisterSayFilter(xs_filter)
