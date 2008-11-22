@@ -23,7 +23,7 @@ def unload():
     es.addons.unregisterSayFilter(xs_filter)
 
 def cmd_top(userid,args):
-    if str(userid) in extendedstats.pending:
+    if str(userid) in xs.pending:
         es.tell(userid,txt.getSimple('sorry_pending'))
         return
     myargs = [scfg.default_top_x,None]
@@ -89,7 +89,7 @@ def cmd_rank(userid,args):
     if len(args) == 1:
         method = xs.getMethod(args[0].lower())
     else:
-        method = xs.getMethod(extendedstats.players.query(steamid,'settings_method'))
+        method = xs.getMethod(xs.players.query(steamid,'settings_method'))
     rank,score,totalplayers = xs.getRankScore(steamid,method)
     es.tell(userid,text.getCmdString(steamid,'rank',method,score,rank,totalplayers))
     
@@ -148,7 +148,7 @@ def cmd_settings(userid,args):
         return
     pplchck('xs_settings_menu_%s' % userid)
     settingsmenu = popuplib.easymenu('xs_settings_menu_%s' % userid,'_popup_choice',settingsCallback)
-    settingsmenu.settitle(text.getSimple('settings','titel_main'))
+    settingsmenu.settitle(text.getSimple('settings','title_main'))
     settingsmenu.addoption('method',text.getSimple('settings','choose_method'))
     settingsmenu.addoption('name',text.getSimple('settings','choose_name'))
     settingsmenu.addoption('exit',text.getSimple('settings','exit'))

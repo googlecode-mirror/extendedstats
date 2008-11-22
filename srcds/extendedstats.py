@@ -21,8 +21,8 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.2.0:147'
-info.versionstatus  = 'Final'
+info.version        = '0.2.1:148'
+info.versionstatus  = 'Beta'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
 info.author         = 'Ojii with loads of help by others'
@@ -71,8 +71,10 @@ def excepter(type1, value1, traceback1):
 if scfg.debug:
     sys.excepthook = excepter
     
-def dbg(text):
+def dbg(text,write_to_file=False):
     es.dbgmsg(int(dcfg['debuglevel']),text)
+    if write_to_file:
+        errorlog.write_lines([' ','XS: Extra debug info:',text,' '] + errorlog.lines(retain=False))
 
 ##############################
 ### LOAD, HELPERS, PUBLICS ###
@@ -97,9 +99,8 @@ def load():
     loadMenus()
     es.regcmd('xs_resetlog','extendedstats/resetlog')
     es.regcmd('xs_cleandb','extendedstats/cleandb')
-    es.regcmd('xs_fixtoplist','extendedstats/fixtoplist')
     es.regcmd('xs_checkversion','extendedstats/checkversion')
-    es.regcmd('xs_cfgsync','extendedstast/cfgsync')
+    es.regcmd('xs_cfgsync','extendedstats/cfgsync')
     es.server.queuecmd('es_load extendedstats/games/%s' % (game))
     dbg('XS: Registered methods:')
     for method in methods:
@@ -118,18 +119,6 @@ def cleandb():
         x = players.dropColumns()
     es.dbgmsg(0,'Database cleanup done. Removed %s unneccessary columns' % x)
     
-def fixtoplist():
-    es.dbgmsg(0,'Fixing toplist')
-    x = 0
-    for steamid in players:
-        x += 1
-        es.dbgmsg(0,'Player %s of %s' % (x,len(allplayers)))
-        if not steamid in toplist:
-            toplist.newplayer(steamid)
-        for method in methods.keys():
-            toplist.update(steamid,method,methods[method](players,steamid))
-    es.dbgmsg(0,'done')
-    
 def checkversion():
     esam = urllib.urlopen('http://addons.eventscripts.com/addons/chklatestver/extendedstats')
     esamversion = esam.read()
@@ -141,7 +130,7 @@ def checkversion():
         es.dbgmsg(0,text.getTokenString('update','no_new',[('currentversion',localversion)]))
         
 def cfgsync():
-    dcfg.sync()    
+    dcfg.sync()
 
 def unload():
     es.unregsaycmd(scfg.say_command_prefix + scfg.command_help)
@@ -488,13 +477,16 @@ class TextConverter(object):
         
         
     def getCmdString(self,steamid,cmd,method,score,rank,totalplayers):
+        methodname = method
         s = self.strings['commands'][cmd]
         if not method in s:
             method = '__standard__'
         s = s[method]
         tokens = self.getTokens(s)
+        dbg('getCmdString(%s,%s,%s,%s,%s,%s)' % (steamid,cmd,method,score,rank,totalplayers))
         for token in tokens:
             name,style,raw = token
+            dbg('Tokens: name: %s (%s), style: %s (%s), raw: %s (%s)' % (name,type(name),style,type(style),raw,type(raw)),True)
             if name == 'rank':
                 s = s.replace(raw,suffix(rank))
             elif name == 'totalplayers':
@@ -502,12 +494,13 @@ class TextConverter(object):
             elif name == 'score':
                 s = s.replace(raw,self.nice(score,style))
             elif name == 'method':
-                s = s.replace(raw,method)
+                s = s.replace(raw,methodname)
             elif name == 'name':
                 s = s.replace(raw,getName(steamid))
             else:
                 tmp = getScore(steamid,method)
                 s = s.replace(raw,self.nice(tmp,style))
+        dbg('Result: %s' % s, True)
         return s
     
     def nice(self,value,style):
@@ -834,6 +827,8 @@ class Table(object):
        
     def fetchone(self):
         one = self.cur.fetchone()
+        # If fetchone(...) fails, uncomment next line
+        # dbg('%s (%s)' % (one,type(one)),True)
         if len(one) == 1:
             return one[0]
         return one
@@ -843,7 +838,10 @@ class Table(object):
         return bool(self.cur.fetchone()) 
     
     def query(self,steamid,key):
-        self.execute("SELECT %s FROM xs_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid))
+        query = "SELECT %s FROM xs_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid)
+        # If query(...) fails, uncomment next line
+        # dbg(query,True)
+        self.execute(query)
         return self.fetchone()
         
     def convert(self,key,value):

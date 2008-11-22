@@ -1,13 +1,16 @@
 from extendedstats.extendedstats import \
 dcfg,\
 newconnected,\
-dbg,pending,\
+dbg,\
+pending,\
 players,\
 weapons,\
 sid,\
 updateTimes,\
-db
-import es, time, gamethread, vecmath
+db,\
+toplist,\
+methods
+import es, time, gamethread, vecmath, playerlib
 
 def load():
     dbg('XS: loading cstrike events...')
