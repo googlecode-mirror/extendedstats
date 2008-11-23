@@ -1,3 +1,33 @@
+---r149---
+-added readme.txt
+-added install.txt
+-added configuration.txt
+-added xs_visible_saycommands cvar
+-added loadEvents(...)
+-fixed textConverter()
+-moved xs-addon events to /events/addonname/addonname.py
+-renamed /games/ to /events/
+-changed saycommands to use a sayfilter rather than saycommands to prevent commands from being eaten
+-changed xs_debuglevel functions
+
+---r148---
+-added missing imports in /games/cstrike/cstrike.py, /games/dod/dod.py and /games/tf/tf.py
+-fixed typing mistake in cmd_settings() in /addons/default.py
+-fixed NameErrors in cmd_rank() in /addons/default.py
+-removed hard-debugging in database classes
+
+---r147---
+-added TextConverter.getSimple()
+-changed strings.ini layout
+-replaced strings in /addons/default.py with TextConverter methods
+-renamed TextConverter.getString() to TextConverter.getCmdString()
+-moved helpstrings to strings.ini
+-moved general strings to strings.ini to allow localization
+-improved methods list popup
+-fixed strings.ini
+-fixed easylist menus (NOTE: oy30 required!)
+-fixed import problems with /games/cstrike/cstrike.py, /games/dod/dod.py and /games/tf/tf.py
+
 ---r146---
 -added strings.ini
 -added /games/cstrike/cstrike.py

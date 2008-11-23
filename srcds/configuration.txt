@@ -1,0 +1,355 @@
+Table of contents:
+------------------
+
+0. Definitions
+1. About this file
+2. Types
+ 2.1 Python Types
+  2.1.1. Basic Python types
+   2.1.1.1. Strings
+   2.1.1.2. Integers
+   2.1.1.3. Floats
+   2.1.1.4. Boolean
+  2.1.2. Advanced Python Types
+   2.1.2.1 Lists
+ 2.2. Cvar Types
+  2.2.1. Strings
+  2.2.2. Integers
+  2.2.2. Lists
+  2.2.3. Time
+  2.2.4. Boolean
+3. Static configuration
+ 3.1. Addon configuration
+  3.1.1. allAddons
+  3.1.2. addonList
+ 3.2. Packages configuration
+  3.2.1. allPackages
+  3.2.2. packageList
+ 3.3 Methods configuration
+  3.3.1. allMethods
+  3.3.2. methodList
+ 3.4. Default command configuration
+  3.4.1. say_command_prefix
+  3.4.2. command_rank
+  3.4.3. comand_methods
+  3.4.4. command_statsme
+  3.4.5. command_help
+  3.4.6. command_settings
+  3.4.7. command_top
+  3.4.8. command_commands
+ 3.5. Addon command configuration
+  3.5.1. command_gungame_ggwon
+  3.5.2. command_weaponstats_weaponstats
+  3.5.3. commadn_weaponstats_myweaponstats
+ 3.6. Miscellaneous Settings
+  3.6.1. settings_menu_resend
+  3.6.2. default_top_x
+  3.6.3. negative_columns
+ 3.7. Debugging settings
+  3.7.1. debug
+4. Dynamic Configuration
+ 4.1. Default cvars
+  4.1.1. xs_default_method
+  4.1.2. xs_debuglevel
+  4.1.3. xs_statsme_methods
+  4.1.4. xs_visible_saycommands
+ 4.2. Addon cvars
+  4.2.1. auto_prune_enabled
+  4.2.2. auto_prune_limit
+  4.2.3. extendedevents_notify_longestjump
+  4.2.4. extendedevents_notify_longestjump_all
+  
+ 0. Definitions
+--------------
+
+ExtendedStats (XS): The name of the script distributed with this file.
+EventScripts (ES): The name of the script for which XS has been written.
+Source Games: Computer games using the Source Engine(tm) by Valve(tm). Eg Counter-Strike Source.
+Players (or Users): Players of Source Games.
+Server: A gameserver which runs a Source Game.
+ES-Addon: An addon for ES. XS is an ES-Addon.
+Addon: An addon for XS. Eg 'gungame', 'wcs'. They are located in /extendedstats/addons/
+Method: A method for XS. Eg 'kdr' and 'team-kdr'
+Package: Several methods together. They are located in /extendedstats/methods/
+Cvar: Variable in servers. Eg mp_friendlyfire
+Python: The programming language Python. See www.python.org
+Saycommand: A XS command triggered by ingame chat.
+Clientcommand: A XS command triggered by the client side console commands.
+Servercommand: A XS command triggered in the server console.
+
+
+
+1. About this file
+------------------
+
+This file should help you configuring XS.
+
+
+
+2. Types
+--------
+
+For a successful configuration a basic knowledge of Python types and the types used for XS cvars is
+required.
+
+ 2.1 Python Types
+ 
+ If you already are familiar with Python you might skip this section.
+ Further information about Python types can be found on the official website www.python.org
+
+  2.1.1. Basic Python types
+
+   2.1.1.1. Strings
+   
+   	Strings in Python can either be double-quote or single-quote. A single-quote string starts and
+   	ends with a single quotation mark '. A double-quote string starts and ends with a double
+   	quotation mark ". If you want to use a single quotation mark in a single-quote string or a
+   	double quotation mark in a double-quote string you have to prefix it with a backslash.
+   	Examples:
+	   	"This is a string"
+	   	'This too'
+	   	'Why don\'t we put some quotation marks in?'
+	   	"\"Yes\", he said"
+
+   2.1.1.2. Integers
+   
+    Integers are full numbers. They are not in quotation marks!. 1 is a string, 1.2 is not and '1'
+    is a string!
+    
+   2.1.1.3. Floats
+   
+    Floats are numbers with floating points. They are not in quotation marks! 1.1 is a float, 1 is
+    not and '1.1' is a string!
+
+   2.1.1.4. Boolean
+   
+    Boolean values are simply True or False. They aer not in quotation marks and the first letter
+    must be capitalised. true and false are wrong. So are 'True' and 'False'.
+
+  2.1.2. Advanced Python Types
+
+   2.1.2.1 Lists
+   
+    Lists are, as the name suggests, lists of values. In Python the types of the values could be
+    mixed. However in XS lists require a certain type: Strings.
+    Lists start with a box bracket [ and end with a closing box bracket ]. Individual values are
+    delimited with commas.
+    An example of a list of strings:
+    	['hello','world']
+
+ 2.2. Cvar Types
+ 
+ Please note that this section only applies to XS and it's cvars. Other addons and Source Games
+ might use different specifications.
+
+  2.2.1. Strings
+  
+   Strings must be put in double quotation marks (see 2.1.1.1. double-quoted strings).
+   Example:
+   	"Hello World"
+
+  2.2.2. Integers
+   
+   Integers are simply numbers. 1,2,3,4 etc. No floating points! (See 2.1.1.2.)
+
+  2.2.2. Lists
+  
+   Lists are strings delimited by commas.
+   Example:
+   	"First item, second item, third item"
+
+  2.2.3. Time
+  
+   Time is a bit more complex. It is basically a string consisting of two parts. An integer in the
+   beginning and a letter. The letter defines the unit and can be one of the following:
+   d: Days
+   w: Weeks
+   m: Months
+   y: Years
+   So "23d" means 23 Days (or 1987200 Seconds). "1w" means 1 week and is equivalent to "7d". Months
+   are treated as 4 weeks and a year is treated as 48 weeks. You may not combine several units and
+   only integers are allowed as first part, no floating points.
+   
+  2.2.4. Boolean
+  
+   Boolean values are basically strings. They are always False unless they are either '1','on' or
+   'true'.
+   
+   
+
+3. Static configuration
+-----------------------
+
+ Changes in the static configuration have no effect unless the server is restarted!
+
+ 3.1. Addon configuration
+ 
+  This affects which XS addons should be loaded when XS is loaded.
+
+  3.1.1. allAddons
+  
+   allAddons is a Boolean value. If it's True, addonList (3.1.2.) is ignored. If it's False,
+   addonList (3.1.2.) will be used.
+
+  3.1.2. addonList
+  
+   addonList is a list of strings. It is only used if allAddons (3.1.1.) is False. The strings in
+   the list are the filenames of the addons to be loaded (without '.py' at the end). 'default' will
+   automatically be added to the list if it's missing in order to preserve core functions of XS.
+
+ 3.2. Packages configuration
+ 
+  This affects method packages which should be loaded when XS is loaded.
+
+  3.2.1. allPackages
+  
+   allPackages is a Boolean value. If it's True, packageList (3.2.2.) is ignored. If it's False,
+   packageList (3.2.2.) will be used.
+
+  3.2.2. packageList
+  
+   packageList is a list of strings. It is only used if allPackages (3.2.1.) is False. The strings
+   in the list are filenames of packages to be loaded (without '.py' at the end).
+
+ 3.3 Methods configuration
+ 
+  This affects which methods should be loaded from the packages.
+
+  3.3.1. allMethods
+  
+   allMethods is a Boolean value. If it's True, all methods from the loaded packages will be
+   loaded. Otherwise methods in the methodList (3.3.2.) will be loaded.
+
+  3.3.2. methodList
+  
+   methodList is a list of strings. It will only be used if allMethods (3.3.1.) is False. The
+   strings in the list are names of methods from the loaded packages which should be loaded.
+
+ 3.4. Default command configuration
+ 
+  In this section you can rename all default commands used ingame.
+
+  3.4.1. say_command_prefix
+  
+   say_command_prefix is a string. It defines a global prefix for all XS saycommands. If you don't
+   want a common prefix make it an empty string (either '' or ""). This prefix obviously only
+   applies for saycommands, not for clientcommands.
+
+  3.4.2. command_rank
+  
+   String, name of the command for the rank function.
+
+  3.4.3. comand_methods
+  
+   String, name of the command which shows a list of available methods.
+
+  3.4.4. command_statsme
+  
+   String, name of the command which shows statistics to a user.
+
+  3.4.5. command_help
+  
+   String, name of the command which provides ingame help.
+
+  3.4.6. command_settings
+  
+   String, name of the command which lets a user change his settings.
+
+  3.4.7. command_top
+  
+   String, name of the command which shows a user a list of top ranked players.
+
+  3.4.8. command_commands
+  
+   String, name of the command which shows a list of available commands to the user.
+
+ 3.5. Addon command configuration
+ 
+  In this section you can rename the names of commands by XS addons.
+
+  3.5.1. command_gungame_ggwon
+  
+   String. If you are using the gungame addon you can rename the command which displays how many
+   times a user has won gungame.
+
+  3.5.2. command_weaponstats_weaponstats
+  
+   String. If you are using the weaponstats addon you can rename the command which displays general
+   weaponstats to a user.
+
+  3.5.3. commadn_weaponstats_myweaponstats
+
+   String. If you are using the weaponstats addon you can rename the command which displays 
+   personal weaponstats to a user.
+   
+ 3.6. Miscellaneous Settings
+
+  3.6.1. settings_menu_resend
+  
+   A Boolean value. If True the settings menu is sent to the user again after he changed something.
+
+  3.6.2. default_top_x
+  
+   Integer. Defines the default amount of players shown when a user triggers the top command
+   without an argument (top instead of top10).
+
+  3.6.3. negative_columns
+  
+   List of Strings. Defines which columns in the database are negative (means the lower a value is
+   the better). Usually doesn't have to be altered.
+
+ 3.7. Debugging settings
+
+  3.7.1. debug
+  
+   Boolean. Enables debugging. Should be left True.
+   
+   
+
+4. Dynamic Configuration
+------------------------
+
+ Changes to the dynamic configuration take immediate effect.
+
+ 4.1. Default cvars
+ 
+  Default XS cvars.
+
+  4.1.1. xs_default_method
+  
+   Default method for rank and top. String.
+
+  4.1.2. xs_debuglevel
+  
+   Integer. -1 means debug messages are surpressed. 0 means debug messages are sent to the server
+   console. 1 means debug messages are sent to the server console and written to the log.txt.
+   -1 Is recommended for normal usage. 0 and especially 1 are only recommended for debugging.
+
+  4.1.3. xs_statsme_methods
+  
+   List of strings. List of methods to be included in the statsme popup.
+
+  4.1.4. xs_visible_saycommands
+  
+   Boolean. If True, saycommands are visible to other users. If False they will be eaten by XS.
+
+ 4.2. Addon cvars
+ 
+  Cvars of XS addons.
+
+  4.2.1. auto_prune_enabled
+  
+   Boolean. Whether auto_prune should be enabled or not.
+
+  4.2.2. auto_prune_limit
+  
+   Time. Amount of time of inactivity after which a user is automatically removed from the
+   database.
+
+  4.2.3. extendedevents_notify_longestjump
+  
+   Boolean. Whether a user should be notified when he makes a new personal longest jump.
+
+  4.2.4. extendedevents_notify_longestjump_all
+  
+   Boolean. Whether all users should be notified when a user makes a new personal longest jump.

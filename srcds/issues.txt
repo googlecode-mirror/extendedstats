@@ -1,1 +1,65 @@
--add myweaponstats
+ERROR: 18 Nov 2008 06:40:42
+XS Version: 0.2.0:147
+
+Mapname: de_dust2
+Players: 4 (2 Bots)
+Traceback (most recent call last):
+  File "/home/k851/css/cstrike/addons/eventscripts/es.py", line 271, in callBlock
+    self.Blocks[blockname]()
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/extendedstats.py", line 419, in addonCommandListener
+    addoncommands[cmd](es.getcmduserid(),args)
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/addons/default.py", line 93, in cmd_rank
+    rank,score,totalplayers = xs.getRankScore(steamid,method)
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/extendedstats.py", line 320, in getRankScore
+    score = toplist.query(steamid,method)
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/extendedstats.py", line 847, in query
+    return self.fetchone()
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/extendedstats.py", line 837, in fetchone
+    if len(one) == 1:
+TypeError: len() of unsized object
+(18:00:01) neX!Tem: 
+
+ERROR: 18 Nov 2008 06:24:53
+XS Version: 0.2.0:147
+
+Mapname: de_dust2
+Players: 4 (3 Bots)
+Traceback (most recent call last):
+  File "/home/k851/css/cstrike/addons/eventscripts/es.py", line 249, in sayFilter
+    newuserid, newtext, newteamonly = listener(newuserid, newtext, newteamonly)
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/addons/default.py", line 57, in xs_filter
+    displayTop(userid, int(x) if x != '' else scfg.default_top_x, method)
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/addons/default.py", line 68, in displayTop
+    toplist.additem(text.getCmdString(player[1],'top',method,player[0],i,totalplayers))
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/extendedstats.py", line 507, in getCmdString
+    s = s.replace(raw,getName(steamid))
+TypeError: expected a character buffer object
+(18:00:08) neX!Tem: 
+
+ERROR: 18 Nov 2008 06:24:52
+XS Version: 0.2.0:147
+
+Mapname: de_dust2
+Players: 4 (3 Bots)
+Traceback (most recent call last):
+  File "/home/k851/css/cstrike/addons/eventscripts/es.py", line 249, in sayFilter
+    newuserid, newtext, newteamonly = listener(newuserid, newtext, newteamonly)
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/addons/default.py", line 57, in xs_filter
+    displayTop(userid, int(x) if x != '' else scfg.default_top_x, method)
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/addons/default.py", line 68, in displayTop
+    toplist.additem(text.getCmdString(player[1],'top',method,player[0],i,totalplayers))
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/extendedstats.py", line 507, in getCmdString
+    s = s.replace(raw,getName(steamid))
+TypeError: expected a character buffer object
+
+ERROR: 18 Nov 2008 06:24:18
+XS Version: 0.2.0:147
+
+Mapname: de_dust2
+Players: 4 (3 Bots)
+Traceback (most recent call last):
+  File "/home/k851/css/cstrike/addons/eventscripts/es.py", line 271, in callBlock
+    self.Blocks[blockname]()
+  File "/home/k851/css/cstrike/addons/eventscripts/extendedstats/extendedstats.py", line 126, in fixtoplist
+    es.dbgmsg(0,'Player %s of %s' % (x,len(allplayers)))
+NameError: global name 'allplayers' is not defined

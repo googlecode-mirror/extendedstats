@@ -21,8 +21,8 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.2.1:149'
-info.versionstatus  = 'Beta'
+info.version        = '0.2.0:147'
+info.versionstatus  = 'Final'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
 info.author         = 'Ojii with loads of help by others'
@@ -33,7 +33,6 @@ xspath = gamepath.joinpath('addons/eventscripts/extendedstats/')
 methodspath = xspath.joinpath('methods/')
 addonspath = xspath.joinpath('addons/')
 txtfile = xspath.joinpath('strings.ini')
-eventsdir = xspath.joinpath('events')
 
 gamedir = gamepath.replace('\\','/')
 gamedir = gamedir[:-1] if gamedir[-1] == '/' else gamedir
@@ -45,9 +44,9 @@ reggedscmd = []
 newconnected = []
 pending = []
 tables = {}
+cmdhelp = {}
 uniquecommands = []
-saycommands = {}
-addonlistpattern = re.compile('\w*[\']\s')
+loadedAddonsList = map(lambda x: str(x),es.addons.getAddonList())
 
 ##############################
 ###     DEBUG HELPER      ####
@@ -72,13 +71,8 @@ def excepter(type1, value1, traceback1):
 if scfg.debug:
     sys.excepthook = excepter
     
-def dbg(text,write_to_file=False):
-    if write_to_file or dcfg['debuglevel'] == '1':
-        errorlog.write_lines([' ','XS: Extra debug info:',text,' '] + errorlog.lines(retain=False))
-    if dcfg['debuglevel'] == '-1':
-        return
-    if dcfg['debuglevel'] in ('0','1'):
-        es.dbgmsg(0,text)
+def dbg(text):
+    es.dbgmsg(int(dcfg['debuglevel']),text)
 
 ##############################
 ### LOAD, HELPERS, PUBLICS ###
@@ -97,16 +91,16 @@ def load():
     loadAddons()
     fillDatabase()
     loadToplist()
-    saycommands[re.compile('\A%s%s' % (scfg.say_command_prefix,scfg.command_help))] = cmd_help
-    es.addons.registerSayFilter(sayfilter)
+    es.regsaycmd(scfg.say_command_prefix + scfg.command_help,'extendedstats/cmd_help')
     es.regclientcmd(scfg.command_help,'extendedstats/cmd_help')
     loadCVARS()
     loadMenus()
     es.regcmd('xs_resetlog','extendedstats/resetlog')
     es.regcmd('xs_cleandb','extendedstats/cleandb')
+    es.regcmd('xs_fixtoplist','extendedstats/fixtoplist')
     es.regcmd('xs_checkversion','extendedstats/checkversion')
-    es.regcmd('xs_cfgsync','extendedstats/cfgsync')
-    es.server.queuecmd('es_load extendedstats/events/%s' % (game))
+    es.regcmd('xs_cfgsync','extendedstast/cfgsync')
+    es.load('extendedstats/games/%s' % (game))
     dbg('XS: Registered methods:')
     for method in methods:
         dbg( '    %s' % method)
@@ -124,18 +118,30 @@ def cleandb():
         x = players.dropColumns()
     es.dbgmsg(0,'Database cleanup done. Removed %s unneccessary columns' % x)
     
+def fixtoplist():
+    es.dbgmsg(0,'Fixing toplist')
+    x = 0
+    for steamid in players:
+        x += 1
+        es.dbgmsg(0,'Player %s of %s' % (x,len(allplayers)))
+        if not steamid in toplist:
+            toplist.newplayer(steamid)
+        for method in methods.keys():
+            toplist.update(steamid,method,methods[method](players,steamid))
+    es.dbgmsg(0,'done')
+    
 def checkversion():
     esam = urllib.urlopen('http://addons.eventscripts.com/addons/chklatestver/extendedstats')
     esamversion = esam.read()
     localversion = info.version.split(':')[0]
     if esamversion != localversion:
-        es.dbgmsg(0,text.getTokenString('update','newversion',[('newversion',esamversion),('currentversion',localversion)]))
-        es.dbgmsg(0,text.getSimple('update','please_update'))
+        es.dbgmsg(0,"You're version of eXtended Stats (%s) is outdated. The newest version is %s." % (localversion,esamversion))
+        es.dbgmsg(0,"Please update from http://addons.eventscripts.com/addons/view/extendedstats")
     else:
-        es.dbgmsg(0,text.getTokenString('update','no_new',[('currentversion',localversion)]))
+        es.dbgmsg(0,"You're version of eXtended Stats (%s) is up to date." % localversion)
         
 def cfgsync():
-    dcfg.sync()
+    dcfg.sync()    
 
 def unload():
     es.unregsaycmd(scfg.say_command_prefix + scfg.command_help)
@@ -212,21 +218,20 @@ def loadCVARS():
     
 def loadMenus():
     p = popuplib.easymenu('xs_help_menu','_popup_choice',helpCallback)
-    p.settitle(text.getSimple('helpmenu','title'))
-    p.addoption('xs_doc_about',text.getSimple('helpmenu','about'))
-    pattern = re.compile('__\w*__')
-    doccmds = filter(lambda x: pattern.match(x),text.strings['help'])
-    for key in doccmds:
+    p.settitle('Helptopics for eXtended Stats:')
+    p.addoption('xs_doc_about','About eXtended Stats')
+    for key in cmdhelp:
         p.addoption(key,key)
-    p.addoption('nodoc',text.getSimple('helpmenu','nodoc'))
+    p.addoption('nodoc','Undocumented Commands')
     
-    nodocl = [text.getSimple('helpmenu','nodoc')] + filter(lambda x: x not in doccmds,uniquecommands)
-    p = popuplib.easylist('xs_doc_nodoc', nodocl if len(nodocl) > 1 else [text.getSimple('helpmenu','nodoc'),text.getSimple('help','no_nodoc')])
+    doccmds = cmdhelp.keys()
+    nodocl = ['Undocumented Commands:'] + filter(lambda x: x not in doccmds,uniquecommands)
+    p = popuplib.easylist('xs_doc_nodoc', nocdocl if len(nodocl) > 1 else ['Undocumented Commands:','No undocumented Commands'])
         
-    p = popuplib.easylist('xs_doc_about',text.getHelp('__about__'))
+    p = popuplib.easylist('xs_doc_about',['About eXtended Stats %s' % info.version,"eXtended Stats is an addon for Mattie's EventScripts","It was written by Ojii"," ","If you want this addon on your server or want to learn more visit:","http://extendedstats.ojii.ch"," ","If you find bugs or other issues please report them on:","http://code.google.com/p/extendedstats/issues/list","->1: Exit"])
     
-    for command in text.strings['help']:
-        p = popuplib.easylist('xs_doc_%s' % command,text.strings['help'][command])
+    for command in cmdhelp:
+        p = popuplib.easylist('xs_doc_%s' % command,['Help: %s' % command] + cmdhelp[command])
             
 def loadToplist():
     global toplist
@@ -248,9 +253,16 @@ def registerMethod(package,name,method): # string,string,method
         methods[name.lower()] = method
         dbg( 'XS: Registered method %s for %s' % (name,package))
     
-def registerCommand(command,addonname,callback,clientcommand=True,saycommand=True):
+def registerEvent(name,event,callback): # string,string,method
+    es.addons.registerForEvent(__import__('extendedstats.addons.%s' % name), event, callback)
+    dbg( 'XS: Registered event %s for %s' % (event, name))
+    
+def registerCommand(command,addonname,callback,clientcommand=True,saycommand=True,helplist=['No help available for this command']):
     global addoncommands, reggedccmd, reggedscmd, cmdhelp, uniquecommands
     uniquecommands.append(command)
+    if type(helplist) == str:
+        helplist = makeList(helplist)
+    cmdhelp[command] = helplist
     if clientcommand:
         es.regclientcmd(command,'extendedstats/addonCommandListener')
         addoncommands[command] = callback
@@ -258,19 +270,17 @@ def registerCommand(command,addonname,callback,clientcommand=True,saycommand=Tru
         dbg( 'XS: Registered clientcommand %s for %s' % (command,addonname))
     if saycommand:
         command = scfg.say_command_prefix + command
-        saycommands[re.compile('\A%s(\s|\Z)' % RESave('rank'))] = callback
+        es.regsaycmd(command,'extendedstats/addonCommandListener')
+        addoncommands[command] = callback
         reggedscmd.append(command)
         dbg( 'XS: Registered saycommand %s for %s' % (command,addonname))
         
-def loadEvents(addonname):
-    if eventsdir.joinpath('%s/%s.py' % (addonname,addonname)).isfile():
-        es.server.queuecmd('es_load extendedstats/events/%s' % addonname)
-        
-def RESave(s):
-    for char in ['.', '^', '$', '*', '+', '?', '{', '[', ']', '\\', '|', '(', ')']:
-        if char in s:
-            s = s.replace(char,'\%s' % char)
-    return s
+def addHelp(command,helptext):
+    global cmdhelp
+    if not type(helptext) == list:
+        helptext = makeList(helptext)
+    cmdhelp[command] = helptext
+    dbg( 'XS: Added help text for %s' % command)
     
 def getScore(steamid,method):
     if method in players.columns:
@@ -378,7 +388,7 @@ def getMethod(method=None):
     return keys[0]
 
 def addonIsLoaded(addonname):
-    return addonname in map(lambda x: addonlistpattern.findall(str(x))[0][:-2],es.addons.getAddonList())
+    return addonname in loadedAddonsList
 
 def updateTimes():
     for userid in playerlib.getUseridList('#human'):
@@ -442,21 +452,501 @@ def pendingCheck(userid):
             pending.remove(ev['userid'])
     else:
         gamethread.delayedname(1, 'xs_delayed_%s' % ev['userid'], pendingCheck, kw={userid:ev['userid']})
-
-def sayfilter(userid,fulltext,teamonly):
-    for saycmd in saycommands:
-        if saycmd.match(fulltext):
-            saycommands[saycmd](userid,fulltext.split(' ')[1:])
-            break
-    if dcfg.as_bool('visible_saycommands'):
-        return userid,fulltext,teamonly
-    return None,None,none
     
 ##############################
 ###         EVENTS         ###
 ##############################
 
-# moved to /games/
+### Builtin Events ###
+
+def server_cvar(ev):
+    if ev['cvarname'] in dcfg.cvars():
+        dcfg[ev['cvarname'][3:]] = ev['cvarvalue']
+        
+def player_connect(ev):
+    newconnected.append(ev['userid'])
+
+def player_spawn(ev):
+    dbg('player_spawn')
+    if not es.isbot(ev['userid']):
+        steamid = es.getplayersteamid(ev['userid'])
+        if not steamid:
+            dbg('NO STEAM ID!!!')
+            return
+        if steamid == 'STEAM_ID_PENDING':
+            dbg('STEAM_ID_PENDING')
+            gamethread.delayedname(1, 'xs_delayed_%s' % ev['userid'], pendingCheck, kw={userid:ev['userid']})
+            pending.append(ev['userid']) 
+            return
+        if not ev['userid'] in newconnected:
+            return
+        if not steamid in players:
+            players.newplayer(steamid)
+        if not steamid in toplist:
+            toplist.newplayer(steamid)
+        players.increment(steamid,'sessions')
+        players.update(steamid,'sessionstart',time.time())
+        players.update(steamid,'lastseen',time.time())
+        players.update(steamid,'teamchange_time',time.time())
+        newname = es.getplayername(ev['userid'])
+        players.name(steamid,newname)
+        newconnected.remove(ev['userid'])
+        if ev['userid'] in pending:
+            pending.remove(ev['userid'])
+        dbg('player spawned: %s' % steamid)
+        
+def pendingCheck(userid):
+    steamid = es.getplayersteamid(userid)
+    if steamid != 'STEAM_ID_PENDING':
+        if not steamid in players:
+            players.newplayer(steamid)
+        if not steamid in toplist:
+            toplist.newplayer(steamid)
+        players.increment(steamid,'sessions')
+        players.update(steamid,'sessionstart',time.time())
+        players.update(steamid,'lastseen',time.time())
+        players.update(steamid,'teamchange_time',time.time())
+        newname = es.getplayername(ev['userid'])
+        players.name(steamid,newname)
+        newconnected.remove(ev['userid'])
+        if ev['userid'] in pending:
+            pending.remove(ev['userid'])
+    else:
+        gamethread.delayedname(1, 'xs_delayed_%s' % ev['userid'], pendingCheck, kw={userid:ev['userid']})
+
+def player_disconnect(ev):
+    global newconnected
+    if ev['userid'] in newconnected:
+        newconnected.remove(ev['userid'])
+        if ev['userid'] in pending:
+            pending.remove(ev['userid'])
+        return
+    if not es.isbot(ev['userid']):
+        dbg( 'player disconnected: %s' % ev['userid'])
+        dbg( 'finnishing player session')
+        steamid = ev['networkid']
+        if not steamid in players:
+            return
+        players.update(steamid,'lastseen',time.time())
+        players.add(steamid,'time',time.time() - players.query(steamid,'sessionstart'))
+        cteam = players.query(steamid,'current_team')
+        if not str(cteam) == '0':
+            players.add(steamid,'team_' + str(cteam) + '_time',time.time() - players.query(steamid,'teamchange_time'))
+        players.update(steamid,'teamchange_time',time.time())
+        players.update(steamid,'current_team',0)
+        for method in methods.keys():
+            toplist.update(steamid,method,methods[method](players,steamid))
+    
+def bomb_defused(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'bomb defused')
+        players.increment(sid(ev),'bomb_defused')
+
+def bomb_dropped(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'bomb dropped')
+        steamid = sid(ev)
+        if steamid:
+            players.increment(sid(ev),'bomb_dropped')
+
+def bomb_exploded(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'bomb exploded')
+        players.increment(sid(ev),'bomb_exploded')
+
+def bomb_pickup(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'bomb pickup')
+        players.increment(sid(ev),'bomb_pickup')
+
+def flashbang_detonate(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'flashbang detonate')
+        players.increment(sid(ev),'flashbang_detonate')
+
+def hegrenade_detonate(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'hegrenade detonate')
+        players.increment(sid(ev),'hegrenade_detonate')
+
+def hostage_follows(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'hostage follows')
+        players.increment(sid(ev),'hostage_follows')
+
+def hostage_hurt(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'hostage hurt')
+        players.increment(sid(ev),'hostage_hurt')
+
+def hostage_killed(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'hostage killed')
+        players.increment(sid(ev),'hostage_killed')
+
+def hostage_rescued(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'hostage rescued')
+        players.increment(sid(ev),'hostage_rescued')
+
+def hostage_stops_following(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'hostage stops following')
+        players.increment(sid(ev),'hostage_stops_following')
+
+def player_changename(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'player changed name')
+        steamid = sid(ev)
+        newname = ev['newname']
+        players.name(steamid,newname)
+
+def player_death(ev):
+    dbg(' ')
+    victimIsBot = bool(es.isbot(ev['userid']))
+    victimSteamid = ev['es_steamid']
+    victimTeam = ev['es_userteam']
+    attackerIsBot = bool(es.isbot(ev['attacker']))
+    attackerSteamid = ev['es_attackersteamid']
+    attackerTeam = ev['es_attackerteam']
+    wasTeamKill = True if attackerTeam == victimTeam else False
+    isHeadshot = True if ev['headshot'] == '1' else False
+    weapon = ev['weapon']
+    dbg('player_death')
+    dbg('victim: %s (%s)' % (victimSteamid,victimIsBot))
+    dbg('attacker: %s (%s)' % (attackerSteamid,attackerIsBot))
+    dbg('teamkill: %s (%s,%s)' % (wasTeamKill,victimTeam,attackerTeam))
+    dbg('headshot: %s (%s)' % (isHeadshot,ev['headshot']))
+    dbg('weapon: %s' % weapon)
+    if weapon in weapons:
+        weapons.increment(weapon,'kills')
+    if wasTeamKill:
+        dbg( 'teamkill')
+        if not victimIsBot:
+            players.increment(victimSteamid,'teamkilled')
+        if not attackerIsBot:
+            players.increment(attackerSteamid,'teamkills')
+    else:
+        dbg( 'kill')
+        if not victimIsBot:
+            players.increment(victimSteamid,'deaths')
+        if not attackerIsBot:
+            players.increment(attackerSteamid,'kills')
+    if not victimIsBot:
+        dbg( 'weapon stats (death)')
+        if 'death_%s' % weapon in players.columns:
+            players.increment(victimSteamid,'death_%s' % weapon)
+        else:
+            dbg('Custom weapon, not in database...')
+    if not attackerIsBot:
+        dbg( 'weapon stats (kill)')
+        if 'kill_%s' % weapon in players.columns:
+            players.increment(attackerSteamid,'kill_%s' % weapon)
+        else:
+            dbg('Custom weapon, not in database...')
+        if isHeadshot:
+            players.increment(attackerSteamid,'headshots')
+
+#    "player_death"        // a game event, name may be 32 charaters long
+#    {
+#        // this extends the original player_death 
+#        "userid"    "short"       // user ID who died                
+#        "attacker"    "short"         // user ID who killed
+#        "weapon"    "string"     // weapon name killer used 
+#        "weaponid"    "short"        // ID of weapon killed used
+#        "damagebits"    "long"        // bits of type of damage
+#        "customkill"    "short"        // type of custom kill
+#        "assister"    "short"        // user ID of assister
+#        "dominated"    "short"        // did killer dominate victim with this kill
+#        "assister_dominated" "short"    // did assister dominate victim with this kill
+#        "revenge"    "short"        // did killer get revenge on victim with this kill
+#        "assister_revenge" "short"    // did assister get revenge on victim with this kill
+#        "weapon_logclassname"    "string"     // weapon name that should be printed on the log
+#    }
+    
+def player_falldamage(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'falldamage')
+        players.add(sid(ev),'falldamage',float(ev['damage']))
+
+def player_hurt(ev):
+    victim = ev['es_steamid']
+    attacker = ev['es_attackersteamid']
+    weapon = ev['weapon']
+    if game == 'cstrike':
+        damage = int(ev['dmg_health']) + int(ev['dmg_armor'])
+    else:
+        damage = int(ev['damage'])
+    if weapon in weapons:
+        weapons.add(weapon,'damage',float(damage))
+    if not es.isbot(ev['userid']):
+        dbg( 'player hurt')
+        players.increment(victim,'hurt')
+        players.add(victim,'hurt_damage',damage)
+    if not es.isbot(ev['attacker']) and bool(int(ev['attacker'])):
+        dbg( 'player hurted')
+        players.increment(attacker,'attacked')
+        players.add(attacker,'attacked_damage',damage)
+        if 'damage_%s' % weapon in players.columns:
+            players.add(attacker,'damage_%s' % weapon,damage)
+
+def player_jump(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'player jumped')
+        steamid = sid(ev)
+        players.increment(steamid,'jump')
+        vStartpos = vecmath.vector(es.getplayerlocation(ev['userid']))
+        players.update(steamid,'jump_startpos',str(vStartpos))
+
+def player_radio(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'player radiomsg')
+        players.increment(sid(ev),'radio')
+
+def player_team(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'player_team')
+        steamid = sid(ev)
+        if steamid:
+            ot = ev['oldteam']
+            nt = ev['team']
+            if ot in ['1','0'] and nt in ['2','3']:
+                dbg( 'spec to play')
+                players.add(steamid,'team_1_time',time.time() - players.query(steamid,'teamchange_time'))
+                players.update(steamid,'teamchange_time',time.time())
+            if ot in ['2','3'] and nt in ['1','0']:
+                dbg( 'play to spec')
+                players.add(steamid,'team_%s_time' % ot,time.time() - players.query(steamid,'teamchange_time'))
+                players.update(steamid,'teamchange_time',time.time())
+            if ot in ['2','3'] and ot != nt:
+                dbg( 'teamswitch')
+                players.add(steamid,'team_%s_time' % ot,time.time() - players.query(steamid,'teamchange_time'))
+                players.update(steamid,'teamchange_time',time.time())
+            players.update(steamid,'current_team',nt)
+        else:
+            dbg( 'disconnected')
+
+def round_end(ev):
+    dbg( 'round end')
+    wt,lt = 'ct','t'
+    if ev['winner'] == '2':
+        wt,lt = lt,wt
+    for userid in playerlib.getUseridList('#human,#%s' % wt):
+        players.increment(es.getplayersteamid(userid),'win')
+    for userid in playerlib.getUseridList('#human,#%s' % lt):
+        players.increment(es.getplayersteamid(userid),'lose')
+    dcfg.sync()
+    updateTimes()
+    db.commit()
+
+def server_addban(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'addban')
+        if ev['networkid'] in players:
+            players.increment(ev['networkid'],'ban')
+
+def smokegrenade_detonate(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'smokegrenade detonate')
+        players.increment(sid(ev),'smokegrenade_detonate')
+        
+def vip_escaped(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'vip escaped')
+        players.increment(sid(ev),'vip_escaped')
+
+def vip_killed(ev):
+    if not es.isbot(ev['attacker']):
+        dbg( 'vip killed')
+        players.increment(ev['attacker'],'vip_killed')
+    if not es.isbot(ev['userid']):
+        dbg( 'vip died')
+        players.increment(sid(ev),'vip_died')
+
+def player_changeclass(ev):
+    dbg( 'player changed class')
+    dbg( ev['class'])
+    pass
+
+def dod_capture_blocked(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'capture blocked')
+        players.increment(sid(ev),'dod_blocks')
+
+def dod_round_win(ev):
+    wt,lt = 'ct','t'
+    dbg( 'round won')
+    if ev['team'] == '2':
+        wt,lt = lt,wt
+    for userid in playerlib.getUseridList('#human,#%s' % wt):
+        players.increment(es.getplayersteamid(userid),'win')
+    for userid in playerlib.getUseridList('#human,#%s' % lt):
+        players.increment(es.getplayersteamid(userid),'lose')
+    dcfg.sync()
+    updateTimes()
+    db.commit()
+
+def dod_bomb_exploded(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'bomb exploded')
+        players.increment(sid(ev),'bomb_exploded')
+
+def dod_bomb_defused(ev):
+    if not es.isbot(ev['userid']):
+        dbg( 'bomb defused')
+        players.increment(sid(ev),'bomb_defused')
+    
+def es_map_start(ev):
+    dcfg.sync()
+    
+def object_destroyed(ev):
+    pass         
+    #    "userid"    "short"       // user ID who died                
+    #    "attacker"    "short"         // user ID who killed
+    #    "assister"    "short"        // user ID of assister
+    #    "weapon"    "string"     // weapon name killer used 
+    #    "objecttype"    "short"        // type of object destroyed
+    
+
+
+def tf_game_over(ev):
+    pass
+    #    "reason"    "string"    // why the game is over ( timelimit, winlimit )
+    
+def ctf_flag_captured(ev):
+    pass
+    #    "capping_team"            "short"
+    #    "capping_team_score"    "short"
+    
+    
+def teamplay_round_win(ev):
+    pass
+    #    "team"        "byte"        // which team won the round
+    #    "winreason"    "byte"        // the reason the team won
+    #    "flagcaplimit"    "short"        // if win reason was flag cap limit, the value of the flag cap limit
+    #    "full_round"    "short"        // was this a full round or a mini-round
+    #    "round_time"    "float"        // elapsed time of this round
+    #    "losing_team_num_caps"    "short"    // # of caps this round by losing team
+    #    "was_sudden_death" "byte"    // did a team win this after entering sudden death
+    
+def teamplay_point_captured(ev):
+    pass
+    #    "cp"        "byte"            // index of the point that was captured
+    #    "cpname"    "string"        // name of the point
+    #    "team"        "byte"            // which team capped
+    #    "cappers"    "string"        // string where each character is a player index of someone that capped
+    
+
+def teamplay_capture_blocked(ev):
+    pass
+    #    "cp"        "byte"            // index of the point that was blocked
+    #    "cpname"    "string"        // name of the point
+    #    "blocker"    "byte"            // index of the player that blocked the cap
+    
+def teamplay_flag_event(ev):
+    pass
+    #    "player"    "short"            // player this event involves
+    #    "eventtype"    "short"            // pick up, capture, defend, dropped
+    
+def teamplay_win_panel(ev):        
+    pass
+    #    "panel_style"        "byte"        // for client to determine layout        
+    #    "winning_team"        "byte"        
+    #    "winreason"        "byte"        // the reason the team won
+    #    "cappers"        "string"    // string where each character is a player index of someone that capped
+    #    "flagcaplimit"        "short"        // if win reason was flag cap limit, the value of the flag cap limit
+    #    "blue_score"        "short"        // red team score
+    #    "red_score"        "short"        // blue team score
+    #    "blue_score_prev"    "short"        // previous red team score
+    #    "red_score_prev"    "short"        // previous blue team score
+    #    "round_complete"    "short"        // is this a complete round, or the end of a mini-round
+    #    "rounds_remaining"    "short"        // # of rounds remaining for wining team, if mini-round
+    #    "player_1"        "short"
+    #    "player_1_points"    "short"
+    #    "player_2"        "short"
+    #    "player_2_points"    "short"
+    #    "player_3"        "short"
+    #    "player_3_points"    "short"
+    
+def localplayer_changedisguise(ev):
+    pass
+    #    "disguised"        "bool"
+    
+def player_builtobject(ev):
+    pass
+    #    "userid"    "short"        // user ID of the spy
+    #    "object"    "byte"
+        
+def player_ignited_inv(ev):#        // sent when a player is ignited by a pyro who is being invulned, only to the medic who's doing the invulning
+    pass
+    #    "pyro_entindex"        "byte"        // entindex of the pyro who ignited the victim
+    #    "victim_entindex"    "byte"        // entindex of the player ignited by the pyro
+    #    "medic_entindex"    "byte"        // entindex of the medic releasing the invuln
+    
+def player_ignited(ev):#            // sent when a player is ignited, only to the two players involved
+    pass
+    #    "pyro_entindex"        "byte"        // entindex of the pyro who ignited the victim
+    #    "victim_entindex"    "byte"        // entindex of the player ignited by the pyro
+    #    "weaponid"            "byte"        // weaponid of the weapon used
+    
+def player_extinguished(ev):#        // sent when a burning player is extinguished by a medic
+    pass
+    #    "userid"    "short"        // userid of the player that was extinguished
+    
+def player_invulned(ev):
+    pass
+    #    "userid"    "short"
+    #    "medic_userid"    "short"
+    
+def player_damaged(ev):
+    pass
+    #    "amount"        "short"
+    #    "type"            "long"
+
+def arena_win_panel(ev):        
+    pass
+    #    "panel_style"        "byte"        // for client to determine layout        
+    #    "winning_team"        "byte"        
+    #    "winreason"        "byte"        // the reason the team won
+    #    "cappers"        "string"    // string where each character is a player index of someone that capped
+    #    "flagcaplimit"        "short"        // if win reason was flag cap limit, the value of the flag cap limit
+    #    "blue_score"        "short"        // red team score
+    #    "red_score"        "short"        // blue team score
+    #    "blue_score_prev"    "short"        // previous red team score
+    #    "red_score_prev"    "short"        // previous blue team score
+    #    "round_complete"    "short"        // is this a complete round, or the end of a mini-round
+    #    "player_1"        "short"
+    #    "player_1_damage"    "short"
+    #    "player_1_healing"    "short"
+    #    "player_1_lifetime"    "short"
+    #    "player_1_kills"    "short"
+    #    "player_2"        "short"
+    #    "player_2_damage"    "short"
+    #    "player_2_healing"    "short"
+    #    "player_2_lifetime"    "short"
+    #    "player_2_kills"    "short"
+    #    "player_3"        "short"
+    #    "player_3_damage"    "short"
+    #    "player_3_healing"    "short"
+    #    "player_3_lifetime"    "short"
+    #    "player_3_kills"    "short"
+    #    "player_4"        "short"
+    #    "player_4_damage"    "short"
+    #    "player_4_healing"    "short"
+    #    "player_4_lifetime"    "short"
+    #    "player_4_kills"    "short"
+    #    "player_5"        "short"
+    #    "player_5_damage"    "short"
+    #    "player_5_healing"    "short"
+    #    "player_5_lifetime"    "short"
+    #    "player_5_kills"    "short"
+    #    "player_6"        "short"
+    #    "player_6_damage"    "short"
+    #    "player_6_healing"    "short"
+    #    "player_6_lifetime"    "short"
+    #    "player_6_kills"    "short"
+
+
 
 ##############################
 ###    TEXT  CONVERSION    ###
@@ -479,33 +969,15 @@ class TextConverter(object):
             pattern = re.compile('([$]%s[$])' % name)
             s = pattern.sub(value,s)
         return s
-    
-    def getHelp(self,command,tokens=[]):
-        l = self.strings['help'][command]
-        if not type(l) == list:
-            l = [l]
-        if tokens:
-            ll = []
-            for s in l:
-                for name,value in tokens:
-                    pattern = re.compile('([$]%s[$])' % name)
-                    s = pattern.sub(value,s)
-                ll.append(s)
-            return ll
-        return l
-        
         
     def getCmdString(self,steamid,cmd,method,score,rank,totalplayers):
-        methodname = method
         s = self.strings['commands'][cmd]
         if not method in s:
             method = '__standard__'
         s = s[method]
         tokens = self.getTokens(s)
-        # dbg('getCmdString(%s,%s,%s,%s,%s,%s)' % (steamid,cmd,method,score,rank,totalplayers))
         for token in tokens:
             name,style,raw = token
-            # dbg('Tokens: name: %s (%s), style: %s (%s), raw: %s (%s)' % (name,type(name),style,type(style),raw,type(raw)),True)
             if name == 'rank':
                 s = s.replace(raw,suffix(rank))
             elif name == 'totalplayers':
@@ -513,13 +985,12 @@ class TextConverter(object):
             elif name == 'score':
                 s = s.replace(raw,self.nice(score,style))
             elif name == 'method':
-                s = s.replace(raw,methodname)
+                s = s.replace(raw,method)
             elif name == 'name':
                 s = s.replace(raw,getName(steamid))
             else:
                 tmp = getScore(steamid,method)
                 s = s.replace(raw,self.nice(tmp,style))
-        dbg('Result: %s' % s, True)
         return s
     
     def nice(self,value,style):
@@ -532,10 +1003,10 @@ class TextConverter(object):
             return value
         elif style == 'f':
             style = 'f.3'
-        if self.cpattern.search(style):
+        if self.cpattern.match(style):
             amount = int(style[2:])
             return value[:value.find('.') + amount + 1 if '.' in value else len(value)]
-        elif self.epattern.search(style):
+        elif self.epattern.match(style):
             amount = int(style[2:])
             value = str(value)
             if not '.' in value:
@@ -545,7 +1016,7 @@ class TextConverter(object):
                 return pre
             else:
                 return '%s.%s' % (pre,post[:amount - len(pre)])
-        elif self.qpattern.search(style):
+        elif self.qpattern.match(style):
             amount = int(style[2:])
             value = str(value)
             if not '.' in value:
@@ -562,7 +1033,7 @@ class TextConverter(object):
                 else:
                     break
             return '%s.%s' % (pre,post)
-        elif self.dpattern.search(style):
+        elif self.dpattern.match(style):
             amount = int(style[3:])
             value = str(value)
             if not '.' in value:
@@ -728,9 +1199,8 @@ class addonDynCfg(dict):
         
 default = {
     'default_method': 'kdr',
-    'debuglevel': '0',
+    'debuglevel': '1',
     'statsme_methods': '',
-    'visible_saycommands': 'on',
 }
 dcfg = dyncfg(gamepath.joinpath('cfg/extendedstats.cfg'),'xs_',default)
         
@@ -847,8 +1317,6 @@ class Table(object):
        
     def fetchone(self):
         one = self.cur.fetchone()
-        # If fetchone(...) fails, uncomment next line
-        # dbg('%s (%s)' % (one,type(one)),True)
         if len(one) == 1:
             return one[0]
         return one
@@ -858,10 +1326,7 @@ class Table(object):
         return bool(self.cur.fetchone()) 
     
     def query(self,steamid,key):
-        query = "SELECT %s FROM xs_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid)
-        # If query(...) fails, uncomment next line
-        # dbg(query,True)
-        self.execute(query)
+        self.execute("SELECT %s FROM xs_%s WHERE %s='%s'" % (key,self.table,self.pk,steamid))
         return self.fetchone()
         
     def convert(self,key,value):

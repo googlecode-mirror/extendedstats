@@ -1,0 +1,76 @@
+Table of Contents:
+------------------
+
+0. Definitions
+1. About this file
+2. Installation of ExtendedStats
+ 2.1. Preparation and dependencies
+ 2.2. Installation
+3. Known Issues
+ 3.1. Sqlite3
+ 3.2. Gungame Sourcemod
+
+
+0. Definitions
+--------------
+
+ExtendedStats (XS): The name of the script distributed with this file.
+EventScripts (ES): The name of the script for which XS has been written.
+Source Games: Computer games using the Source Engine(tm) by Valve(tm). Eg Counter-Strike Source.
+Players: Players of Source Games.
+Server: A gameserver which runs a Source Game.
+ES-Addon: An addon for ES. XS is an ES-Addon.
+Addon: An addon for XS. Eg 'gungame', 'wcs'
+Method: A method for XS. Eg 'kdr' and 'team-kdr'
+Static configuration: Configurations which can't be changed on runtime. These are defined in
+					  staticConfiguration.py.
+Dynamic configuration: Configuration which can be changed on runtime. Defined in extendedstats.cfg
+Root folder: The root folder of the game on the server. Eg: /srcds/cstrike/
+             This folder usually has subfolders called: 'cfg', 'maps', 'addons' and more
+       
+             
+             
+1. About this file
+------------------
+
+ This file should help you installing XS. For general information or configuration help, please 
+ refer to the respective files.
+
+
+
+2. Installation of ExtendedStats
+--------------------------------
+
+ 2.1. Pereparation and dependencies
+
+  XS has no dependencies except the standard ES libraries. However Linux users should read 3.1.
+  Despite the the fact that there are no dependencies, using ExtendedEvents is highly recommended,
+  especially for Day of Defeat Source users.
+  If you upgrade XS from an older version it is highly recommended to make a backup of the database
+  and the configuration files.
+  
+ 2.2. Installation
+ 
+  First of all you should edit staticConfiguration.py and extendedstats.cfg (see configuration.txt)
+  to your needs.
+  Then copy all files into the root folder of your server, preserving the folder structure.
+  Put es_load extendedstats into the autoexec.cfg (if you are using gungame, extendedevents or
+  other addons make sure extendedstats is after those load commands!).
+  Restart your server.
+  
+  
+  
+3. Known Issues
+---------------
+
+ Although I try to fix all known issues before release, there are still two left which I either
+ can't fix or which have no priority.
+ 
+ 3.1. Sqlite3
+ 
+  As this addon uses Sqlite3 for data storage the Known Issues of ES apply. See the wiki page for
+  more information: http://www.eventscripts.com/pages/Known_Issues#sqlite3
+  
+ 3.2. Gungame Sourcemod
+ 
+  The Sourcemod version of Gungame isn't detected on Day of Defeat Source.
