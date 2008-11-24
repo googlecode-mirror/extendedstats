@@ -21,8 +21,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.2.1:149'
-info.versionstatus  = 'Beta'
+info.version        = '0.2.1:150'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
 info.author         = 'Ojii with loads of help by others'
@@ -213,20 +212,23 @@ def loadCVARS():
 def loadMenus():
     p = popuplib.easymenu('xs_help_menu','_popup_choice',helpCallback)
     p.settitle(text.getSimple('helpmenu','title'))
-    p.addoption('xs_doc_about',text.getSimple('helpmenu','about'))
+    p.addoption('about',text.getSimple('helpmenu','about'))
     pattern = re.compile('__\w*__')
-    doccmds = filter(lambda x: pattern.match(x),text.strings['help'])
+    doccmds = filter(lambda x: not pattern.search(x),text.strings['help'])
     for key in doccmds:
         p.addoption(key,key)
     p.addoption('nodoc',text.getSimple('helpmenu','nodoc'))
     
     nodocl = [text.getSimple('helpmenu','nodoc')] + filter(lambda x: x not in doccmds,uniquecommands)
-    p = popuplib.easylist('xs_doc_nodoc', nodocl if len(nodocl) > 1 else [text.getSimple('helpmenu','nodoc'),text.getSimple('help','no_nodoc')])
+    p = popuplib.easylist('xs_doc_nodoc', nodocl if len(nodocl) > 1 else [text.getSimple('helpmenu','no_nodoc')])
+    p.settitle(text.getSimple('helpmenu','nodoc'))
         
     p = popuplib.easylist('xs_doc_about',text.getHelp('__about__'))
+    p.settitle(text.getHelp('__about__title__',[('version',info.version)]))
     
     for command in text.strings['help']:
-        p = popuplib.easylist('xs_doc_%s' % command,text.strings['help'][command])
+        p = popuplib.easylist('xs_doc_%s' % command,text.getHelp(command))
+        p.settitle('eXtended Stats Help: %s' % command)
             
 def loadToplist():
     global toplist
@@ -258,7 +260,7 @@ def registerCommand(command,addonname,callback,clientcommand=True,saycommand=Tru
         dbg( 'XS: Registered clientcommand %s for %s' % (command,addonname))
     if saycommand:
         command = scfg.say_command_prefix + command
-        saycommands[re.compile('\A%s(\s|\Z)' % RESave('rank'))] = callback
+        saycommands[re.compile('%s(\s|\Z)' % RESafe(command))] = callback
         reggedscmd.append(command)
         dbg( 'XS: Registered saycommand %s for %s' % (command,addonname))
         
@@ -266,7 +268,7 @@ def loadEvents(addonname):
     if eventsdir.joinpath('%s/%s.py' % (addonname,addonname)).isfile():
         es.server.queuecmd('es_load extendedstats/events/%s' % addonname)
         
-def RESave(s):
+def RESafe(s):
     for char in ['.', '^', '$', '*', '+', '?', '{', '[', ']', '\\', '|', '(', ')']:
         if char in s:
             s = s.replace(char,'\%s' % char)
@@ -344,7 +346,10 @@ def getName(steamid):
     settings_name = players.query(steamid,'settings_name')
     if settings_name:
         return settings_name
-    return players.query(steamid,'name1')
+    dbname = players.query(steamid,'name1')
+    if dbname:
+        return dbname
+    return 'unnamed'
 
 ### Helpers ###
             
@@ -417,8 +422,9 @@ def addonCommandListener():
     cmd = args.pop(0)
     addoncommands[cmd](es.getcmduserid(),args)
     
-def cmd_help():
-    userid = es.getcmduserid()
+def cmd_help(userid=None,args=None):
+    if not userid:
+        userid = es.getcmduserid()
     popuplib.send('xs_help_menu',userid)
     
 def helpCallback(userid,choice,name):
@@ -444,13 +450,21 @@ def pendingCheck(userid):
         gamethread.delayedname(1, 'xs_delayed_%s' % ev['userid'], pendingCheck, kw={userid:ev['userid']})
 
 def sayfilter(userid,fulltext,teamonly):
+    fulltext = fulltext.strip('"') 
+    dbg('Sayfilter triggered')
+    dbg(fulltext)
     for saycmd in saycommands:
-        if saycmd.match(fulltext):
+        dbg('checking command...')
+        if saycmd.search(fulltext):
+            dbg('command found!')
             saycommands[saycmd](userid,fulltext.split(' ')[1:])
-            break
-    if dcfg.as_bool('visible_saycommands'):
-        return userid,fulltext,teamonly
-    return None,None,none
+            if dcfg.as_bool('visible_saycommands'):
+                dbg('visible saycommands on, show command')
+                return userid,fulltext,teamonly
+            dbg('visible saycommands off, eat command')
+            return userid,None,None
+    dbg('nothing found')
+    return userid,fulltext,teamonly
     
 ##############################
 ###         EVENTS         ###
@@ -502,10 +516,10 @@ class TextConverter(object):
             method = '__standard__'
         s = s[method]
         tokens = self.getTokens(s)
-        # dbg('getCmdString(%s,%s,%s,%s,%s,%s)' % (steamid,cmd,method,score,rank,totalplayers))
+        dbg('getCmdString(%s,%s,%s,%s,%s,%s)' % (steamid,cmd,method,score,rank,totalplayers))
         for token in tokens:
             name,style,raw = token
-            # dbg('Tokens: name: %s (%s), style: %s (%s), raw: %s (%s)' % (name,type(name),style,type(style),raw,type(raw)),True)
+            dbg('Tokens: name: %s (%s), style: %s (%s), raw: %s (%s)' % (name,type(name),style,type(style),raw,type(raw)))
             if name == 'rank':
                 s = s.replace(raw,suffix(rank))
             elif name == 'totalplayers':
@@ -533,9 +547,11 @@ class TextConverter(object):
         elif style == 'f':
             style = 'f.3'
         if self.cpattern.search(style):
+            dbg('comma pattern found (%s)' % style)
             amount = int(style[2:])
             return value[:value.find('.') + amount + 1 if '.' in value else len(value)]
         elif self.epattern.search(style):
+            dbg('exclamationmark pattern found (%s)' % style)
             amount = int(style[2:])
             value = str(value)
             if not '.' in value:
@@ -546,6 +562,7 @@ class TextConverter(object):
             else:
                 return '%s.%s' % (pre,post[:amount - len(pre)])
         elif self.qpattern.search(style):
+            dbg('questionmark pattern found (%s)' % style)
             amount = int(style[2:])
             value = str(value)
             if not '.' in value:
@@ -561,8 +578,11 @@ class TextConverter(object):
                     post = post[:-1]
                 else:
                     break
+            if not post:
+                return pre
             return '%s.%s' % (pre,post)
         elif self.dpattern.search(style):
+            dbg('double pattern found (%s)' % style)
             amount = int(style[3:])
             value = str(value)
             if not '.' in value:
@@ -578,13 +598,16 @@ class TextConverter(object):
                     post = post[:-1]
                 else:
                     break
+            if not post:
+                return pre
             return '%s.%s' % (pre,post)
             
         else:
+            dbg('no pattern found (%s)' % style)
             raise ValueError, 'Invalid token type: %s' % style
         
     def getTokens(self,s):
-        pattern = re.compile('[$][(]?\w?[.]?\d?[)]?\w*[$]')
+        pattern = re.compile('[$][(]?\w?[.]?[!]?[?]?[!?]?\d?[)]?\w*[$]')
         return map(lambda x: (x[x.find(')') + 1 if ')' in x else 1:-1],x[2:x.find(')')] if '(' in x else 's',x),pattern.findall(s))
 text = TextConverter()
 
@@ -1045,11 +1068,11 @@ columns = [
     ('lose', 'REAL DEFAULT 0.0'),
     ('rounds', 'REAL DEFAULT 0.0'),
     ('ban', 'REAL DEFAULT 0.0'),
-    ('name1', 'TEXT DEFAULT NULL'),
-    ('name2', 'TEXT DEFAULT NULL'),
-    ('name3', 'TEXT DEFAULT NULL'),
-    ('name4', 'TEXT DEFAULT NULL'),
-    ('name5', 'TEXT DEFAULT NULL'),
+    ('name1', "TEXT DEFAULT 'unnamed'"),
+    ('name2', "TEXT DEFAULT NULL"),
+    ('name3', "TEXT DEFAULT NULL"),
+    ('name4', "TEXT DEFAULT NULL"),
+    ('name5', "TEXT DEFAULT NULL"),
     ('settings_name','TEXT DEFAULT NULL'),
     ('settings_method','TEXT DEFAULT NULL'),
 ]

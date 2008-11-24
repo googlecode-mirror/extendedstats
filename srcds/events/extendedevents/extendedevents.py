@@ -12,7 +12,6 @@ def load():
 
 def player_land(ev):
     if not es.isbot(ev['userid']):
-        data = extendedstats.data
         steamid = extendedstats.sid(ev)
         extendedstats.dbg('player land')
         pos = vecmath.vector(es.getplayerlocation(ev['userid']))

@@ -117,10 +117,10 @@ def cmd_statsme(userid,args):
     if defaultmethod not in methods_used:
         defaultrank,defaultscore,allplageyers = xs.getRankScore(steamid,defaultmethod)
         methods_used.append(defaultmethod)
-    personalrank,personalescore = None,None
+    personalrank,personalscore = None,None
     settings_method = xs.players.query(steamid,'settings_method')
     if settings_method in xs.methods.keys() and settings_method not in methods_used:
-        personalrank,personalescore,allplayers = xs.getRankScore(steamid,settings_method)
+        personalrank,personalscore,allplayers = xs.getRankScore(steamid,settings_method)
         methods_used.append(settings_method)
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
@@ -173,11 +173,14 @@ def settingsCallback(userid,choice,name):
         pplchck('xs_name_menu_%s' % userid)
         namemenu = popuplib.easymenu('xs_name_menu_%s' % userid,'_popup_choice',settingsCallback2)
         namemenu.settitle(text.getSimple('settings','title_name'))
-        settings_name = xs.players.query(steamid,'settings_method')
-        xs.players.execute("SELECT name1,name2,name3,name4,name5 FROM xs_main WHERE steamid='%s'" % (steamid))
-        names = xs.players.fetchone()
-        if not type(names) == tuple:
-            names = [names]
+        settings_name = xs.players.query(steamid,'settings_name')
+        names = []
+        for x in [1,2,3,4,5]:
+            name = xs.players.query(steamid,'name%s' % x)
+            if name:
+                names.append(name)
+            else:
+                break
         for name in names:
             if name == settings_name:
                 namemenu.addoption(('name',name),'-> %s' % name)
@@ -193,10 +196,11 @@ def settingsCallback2(userid,choice,name):
     steamid = es.getplayersteamid(userid)
     if choice == 1:
         cmd_settings(userid,None)
+        return
     elif choice == 2:
-        if name == 'methods_menu':
+        if name == 'xs_methods_menu_%s' % userid:
             xs.players.update(steamid,'settings_method','NULL')
-        elif name == 'name_menu':
+        elif name == 'xs_name_menu_%s' % userid:
             xs.players.update(steamid,'settings_name','NULL')
     else:
         xs.players.update(steamid,'settings_%s' % choice[0],choice[1])
