@@ -3,6 +3,7 @@ dcfg,\
 newconnected,\
 dbg,\
 pending,\
+pendingCheck,\
 players,\
 weapons,\
 sid,\
@@ -14,10 +15,6 @@ import es, time, gamethread, vecmath, playerlib
 
 def load():
     dbg('XS: loading cstrike events...')
-
-def server_cvar(ev):
-    if ev['cvarname'] in dcfg.cvars():
-        dcfg[ev['cvarname'][3:]] = ev['cvarvalue']
         
 def player_connect(ev):
     newconnected.append(ev['userid'])

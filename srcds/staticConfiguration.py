@@ -38,6 +38,8 @@ command_weaponstats_myweaponstats = 'myweaponstats'
 
 settings_menu_resend = True # BOOLEAN
 
+language = 'en' # String, a file called strings_LANGUAGE.ini must be present in the addons direction.
+
 default_top_x = 5 # INTEGER
 
 negative_columns = ['deaths','teamkills','hurt_damage','lose','ban'] # Columns which should be threated negatively in direct calculation

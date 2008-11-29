@@ -21,7 +21,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.2.1:150'
+info.version        = '0.2.1:152'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
 info.author         = 'Ojii with loads of help by others'
@@ -31,7 +31,6 @@ gamepath = path.path(str(es.ServerVar('eventscripts_gamedir')))
 xspath = gamepath.joinpath('addons/eventscripts/extendedstats/')
 methodspath = xspath.joinpath('methods/')
 addonspath = xspath.joinpath('addons/')
-txtfile = xspath.joinpath('strings.ini')
 eventsdir = xspath.joinpath('events')
 
 gamedir = gamepath.replace('\\','/')
@@ -102,9 +101,10 @@ def load():
     loadCVARS()
     loadMenus()
     es.regcmd('xs_resetlog','extendedstats/resetlog')
-    es.regcmd('xs_cleandb','extendedstats/cleandb')
+    #es.regcmd('xs_cleandb','extendedstats/cleandb')
     es.regcmd('xs_checkversion','extendedstats/checkversion')
     es.regcmd('xs_cfgsync','extendedstats/cfgsync')
+    es.regcmd('xs_dbsync','extendedstats/dbsync')
     es.server.queuecmd('es_load extendedstats/events/%s' % (game))
     dbg('XS: Registered methods:')
     for method in methods:
@@ -135,6 +135,9 @@ def checkversion():
         
 def cfgsync():
     dcfg.sync()
+    
+def dbsync():
+    db.commit()
 
 def unload():
     es.unregsaycmd(scfg.say_command_prefix + scfg.command_help)
@@ -224,7 +227,7 @@ def loadMenus():
     p.settitle(text.getSimple('helpmenu','nodoc'))
         
     p = popuplib.easylist('xs_doc_about',text.getHelp('__about__'))
-    p.settitle(text.getHelp('__about__title__',[('version',info.version)]))
+    p.settitle(text.getHelp('__about__title__',[('version',info.version)])[0])
     
     for command in text.strings['help']:
         p = popuplib.easylist('xs_doc_%s' % command,text.getHelp(command))
@@ -476,8 +479,15 @@ def sayfilter(userid,fulltext,teamonly):
 ###    TEXT  CONVERSION    ###
 ##############################
 
+class MissingLanguageFileError(Exception):
+    def __init__(self,value):
+        self.value = value
+    def __str__(self):
+        return repr("No language files for 'en' or '%s' could be found!" % self.value)
+
 class TextConverter(object):
-    def __init__(self):
+    def __init__(self,lang):
+        txtfile = xspath.joinpath('strings_%s.ini' % scfg.language)
         self.strings = configobj.ConfigObj(txtfile)
         self.cpattern = re.compile('f[.]\d+')
         self.qpattern = re.compile('f[?]\d+')
@@ -525,22 +535,28 @@ class TextConverter(object):
             elif name == 'totalplayers':
                 s = s.replace(raw,str(totalplayers))
             elif name == 'score':
-                s = s.replace(raw,self.nice(score,style))
+                scr = self.nice(score,style)
+                dbg('Score: %s' % scr)
+                s = s.replace(raw,scr)
             elif name == 'method':
                 s = s.replace(raw,methodname)
             elif name == 'name':
                 s = s.replace(raw,getName(steamid))
             else:
-                tmp = getScore(steamid,method)
-                s = s.replace(raw,self.nice(tmp,style))
+                tmp = getScore(steamid,name)
+                dbg('Temp: %s' % tmp)
+                scr = self.nice(tmp,style)
+                dbg('Score: %s' % scr)
+                s = s.replace(raw,scr)
         dbg('Result: %s' % s, True)
         return s
     
     def nice(self,value,style):
+        dbg('Input value: %s' % value)
         if style[0] not in ('s','f','i'):
             raise ValueError, 'Invalid token type: %s' % style
         elif style == 'i':
-            return str(int(value))
+            return str(value).split('.')[0]
         value = str(value)
         if style == 's':
             return value
@@ -609,11 +625,15 @@ class TextConverter(object):
     def getTokens(self,s):
         pattern = re.compile('[$][(]?\w?[.]?[!]?[?]?[!?]?\d?[)]?\w*[$]')
         return map(lambda x: (x[x.find(')') + 1 if ')' in x else 1:-1],x[2:x.find(')')] if '(' in x else 's',x),pattern.findall(s))
-text = TextConverter()
+text = TextConverter('en')
 
 ##############################
 ### DYNAMIC CONFIGURATION  ###
 ##############################
+
+def server_cvar(ev):
+    if ev['cvarname'] in dcfg.cvars():
+        dcfg[ev['cvarname'][3:]] = ev['cvarvalue']
 
 class dyncfg(dict):
     def __init__(self,f,cvar_prefix='',default={}):
@@ -654,26 +674,29 @@ class dyncfg(dict):
                 return True
         return False
 
-    def __setitem__(self,s,v):
-        s = str(s)
-        v = str(v)
-        self.__d__[s] = v
-        self.__cvars__.append(self.__cvarprefix__ + s)
+    def __setitem__(self,key,value):
+        key = str(key)
+        value = str(value)
+        cvar = self.__cvarprefix__ + key
+        self.__d__[key] = value
+        if not cvar in self.__cvars__:
+            self.__cvars__.append(cvar)
         L = self.__filepath__.lines(retain=False)
         done = False
         for line in L:
             if not line.startswith('//') and line.count('=') != 0:
-                if line.startswith(s):
+                if line.startswith(key):
                     if line.count('//') == 1:
-                        L[L.index(line)] = '%s = %s //%s' % (s,v,line.split('//')[1])
+                        L[L.index(line)] = '%s = %s //%s' % (key,value,line.split('//')[1])
                     else:
-                        L[L.index(line)] = '%s = %s' % (s,v)
+                        L[L.index(line)] = '%s = %s' % (key,value)
                     done = True
                     break
         if not done:
-            L.append('%s = %s' % (s,v))
+            L.append('%s = %s' % (key,value))
         self.__filepath__.write_lines(L)
-        es.ServerVar(self.__cvarprefix__ + s,v).addFlag('notify')
+        es.ServerVar(cvar,value).addFlag('notify')
+            
 
     def sync(self):
         self.__d__ = {}

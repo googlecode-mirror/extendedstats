@@ -1,17 +1,9 @@
-# eXtendedStats default modules for Version 0.0.1:13
-
-# You have to import extendedstats to register your methods
 from extendedstats import extendedstats
 import path, es, time
 
 packagename = 'standard'
 
-# This function will be called when your method is imported.
 def load():
-    # To register a method, call the registerMethod() function of extendedstats
-    # The first parameter is the filename of your packages, in this case default (without .py)
-    # The second parameter is the name you want to give you method. Unlike this examples, try to choose something unique
-    # The last parameter is the function which shall be called in your script to calculate the score
     extendedstats.registerMethod(packagename,'kdr',KDR)
     extendedstats.registerMethod(packagename,'kills',PureKills)
     extendedstats.registerMethod(packagename,'deaths',PureDeaths)
@@ -23,11 +15,21 @@ def load():
     extendedstats.registerMethod(packagename,'damage',damage)
     
 def KDR(players,steamid):
-    # The following three lines are VERY IMPORTANT: Zero Division Prevention!
-    deaths = players.query(steamid,'deaths') # We set a new variable called deaths to 1
-    if deaths == 0: # If the player has died at least once
-        deaths = 1.0 # We can set the deaths variable to the actual value
-    return float(players.query(steamid,'kills')) / float(deaths) # This all is done because we divide by deaths. Prevent your method from dividing by zero!
+    dbg = extendedstats.dbg
+    dbg('kdr calculation...')
+    deaths = players.query(steamid,'deaths')
+    dbg('deaths: %s' % deaths)
+    kills = players.query(steamid,'kills')
+    dbg('kills: %s' % kills)
+    if deaths == 0:
+        deaths = 1.0
+        dbg('deaths are 0, setting 1.0')
+        if kills == 0:
+            dbg('kills are 0, returning 1.0')
+            return 1.0
+    kdr = float(kills) / float(deaths)
+    dbg('kdr: %s (%s kills, %s deaths)' % (kdr,kills,deaths))
+    return kdr
     
 def PureKills(players,steamid):
     # Probably the easiest you can do

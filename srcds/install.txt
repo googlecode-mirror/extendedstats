@@ -43,9 +43,12 @@ Root folder: The root folder of the game on the server. Eg: /srcds/cstrike/
 
  2.1. Pereparation and dependencies
 
-  XS has no dependencies except the standard ES libraries. However Linux users should read 3.1.
-  Despite the the fact that there are no dependencies, using ExtendedEvents is highly recommended,
-  especially for Day of Defeat Source users.
+  XS has no dependencies except the standard ES libraries. Note that the oldest supported version
+  of EventScripts is 2.0.0.247. The lowest supported version of popuplib is oy30. Using older
+  versions will most certainly result in XS being unable to run. However Linux users should read
+  Section 3.1.
+  Despite the the fact that there are no dependencies, using ExtendedEvents is highly
+  recommended, especially for Day of Defeat Source users.
   If you upgrade XS from an older version it is highly recommended to make a backup of the database
   and the configuration files.
   

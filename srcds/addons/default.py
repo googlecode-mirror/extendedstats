@@ -17,7 +17,8 @@ def load():
     
 def menus():
     pplchck('xs_methods_list')
-    m = popuplib.easylist('xs_methods_list',[text.getSimple('methodslist','title')] + xs.methods.keys())
+    m = popuplib.easylist('xs_methods_list', xs.methods.keys())
+    m.settitle(text.getSimple('methodslist','title'))
     
 def unload():
     es.addons.unregisterSayFilter(xs_filter)
@@ -90,7 +91,7 @@ def cmd_rank(userid,args):
         method = xs.getMethod(args[0].lower())
     else:
         method = xs.getMethod(xs.players.query(steamid,'settings_method'))
-    rank,score,totalplayers = xs.getRankScore(steamid,method)
+    rank,score,totalplayers = xs.getRankScore(steamid,method, True)
     es.tell(userid,text.getCmdString(steamid,'rank',method,score,rank,totalplayers))
     
 def cmd_statsme(userid,args):
@@ -98,7 +99,7 @@ def cmd_statsme(userid,args):
         es.tell(userid,txt.getSimple('messages','sorry_pending'))
         return
     steamid = es.getplayersteamid(userid)
-    methods_used = [xs.dcfg['default_method']]
+    methods_used = []
     toprank = None
     lowrank = None
     refresh = True
@@ -115,12 +116,14 @@ def cmd_statsme(userid,args):
     defaultmethod = xs.getMethod()
     defaultrank,defaultscore = None,None
     if defaultmethod not in methods_used:
-        defaultrank,defaultscore,allplageyers = xs.getRankScore(steamid,defaultmethod)
+        defaultrank,defaultscore,allplageyers = xs.getRankScore(steamid,defaultmethod,refresh)
+        refresh = False
         methods_used.append(defaultmethod)
     personalrank,personalscore = None,None
     settings_method = xs.players.query(steamid,'settings_method')
     if settings_method in xs.methods.keys() and settings_method not in methods_used:
-        personalrank,personalscore,allplayers = xs.getRankScore(steamid,settings_method)
+        personalrank,personalscore,allplayers = xs.getRankScore(steamid,settings_method,refresh)
+        refresh = False
         methods_used.append(settings_method)
     pplchck('xs_statshim_%s' % userid)
     statshim = popuplib.easylist('xs_statshim_%s' % userid)
@@ -135,7 +138,8 @@ def cmd_statsme(userid,args):
         mlist = xs.dcfg.as_list('statsme_methods')
         for method in filter(lambda x: (x in xs.methods or x in xs.players.columns) and x not in methods_used,mlist):
             methods_used.append(method)
-            rank,score,allplayers = xs.getRankScore(steamid,method)
+            rank,score,allplayers = xs.getRankScore(steamid,method,refresh)
+            refresh = False
             statshim.additem(text.getCmdString(steamid,'statsme',method,score,rank,allplayers))
     statshim.send(userid)
     

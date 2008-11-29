@@ -13,10 +13,6 @@ import es, time, gamethread, vecmath, playerlib
 
 def load():
     dbg('XS: loading tf events...')
-    
-def server_cvar(ev):
-    if ev['cvarname'] in dcfg.cvars():
-        dcfg[ev['cvarname'][3:]] = ev['cvarvalue']
         
 def player_connect(ev):
     newconnected.append(ev['userid'])
