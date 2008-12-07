@@ -21,7 +21,7 @@ if not 'default' in scfg.addonList:
 ##############################
 
 info = es.AddonInfo()
-info.version        = '0.2.1:152'
+info.version        = '0.2.1:154'
 info.basename       = 'extendedstats'
 info.name           = 'eXtended Stats'
 info.author         = 'Ojii with loads of help by others'
@@ -277,10 +277,10 @@ def RESafe(s):
             s = s.replace(char,'\%s' % char)
     return s
     
-def getScore(steamid,method):
+def getScore(steamid,method,ignore_negative=False):
     if method in players.columns:
         score = players.query(steamid,method)
-        if method in scfg.negative_columns:
+        if method in scfg.negative_columns and not ignore_negative:
             return -score
         return score
     if method not in methods:
@@ -385,8 +385,7 @@ def getMethod(method=None):
         return dcfg['default_method'].strip()
     return keys[0]
 
-def addonIsLoaded(addonname):
-    return addonname in map(lambda x: addonlistpattern.findall(str(x))[0][:-2],es.addons.getAddonList())
+addonIsLoaded = lambda addonname: addonname in map(lambda x: addonlistpattern.findall(str(x))[0][:-2],es.addons.getAddonList())
 
 def updateTimes():
     for userid in playerlib.getUseridList('#human'):
@@ -458,7 +457,7 @@ def sayfilter(userid,fulltext,teamonly):
     dbg(fulltext)
     for saycmd in saycommands:
         dbg('checking command...')
-        if saycmd.search(fulltext):
+        if saycmd.match(fulltext): # if match fails: .search(...)
             dbg('command found!')
             saycommands[saycmd](userid,fulltext.split(' ')[1:])
             if dcfg.as_bool('visible_saycommands'):
@@ -487,7 +486,7 @@ class MissingLanguageFileError(Exception):
 
 class TextConverter(object):
     def __init__(self,lang):
-        txtfile = xspath.joinpath('strings_%s.ini' % scfg.language)
+        txtfile = xspath.joinpath('strings_%s.ini' % lang)
         self.strings = configobj.ConfigObj(txtfile)
         self.cpattern = re.compile('f[.]\d+')
         self.qpattern = re.compile('f[?]\d+')
@@ -543,7 +542,7 @@ class TextConverter(object):
             elif name == 'name':
                 s = s.replace(raw,getName(steamid))
             else:
-                tmp = getScore(steamid,name)
+                tmp = getScore(steamid,name,True)
                 dbg('Temp: %s' % tmp)
                 scr = self.nice(tmp,style)
                 dbg('Score: %s' % scr)
@@ -565,11 +564,10 @@ class TextConverter(object):
         if self.cpattern.search(style):
             dbg('comma pattern found (%s)' % style)
             amount = int(style[2:])
-            return value[:value.find('.') + amount + 1 if '.' in value else len(value)]
+            return str(round(float(value),amount))
         elif self.epattern.search(style):
             dbg('exclamationmark pattern found (%s)' % style)
             amount = int(style[2:])
-            value = str(value)
             if not '.' in value:
                 return value
             pre,post = value.split('.')
@@ -580,23 +578,8 @@ class TextConverter(object):
         elif self.qpattern.search(style):
             dbg('questionmark pattern found (%s)' % style)
             amount = int(style[2:])
-            value = str(value)
-            if not '.' in value:
-                return value
-            pre,post = value.split('.')
-            if len(pre) >= amount:
-                return pre
-            post = post[:amount-len(pre)]
-            while 1:
-                if not post:
-                    break
-                if post[-1] == '0':
-                    post = post[:-1]
-                else:
-                    break
-            if not post:
-                return pre
-            return '%s.%s' % (pre,post)
+            value = float(value)
+            return self._noZeroRound(value,amount)
         elif self.dpattern.search(style):
             dbg('double pattern found (%s)' % style)
             amount = int(style[3:])
@@ -606,26 +589,32 @@ class TextConverter(object):
             pre,post = value.split('.')
             if len(pre) >= amount:
                 return pre
-            post = post[:amount-len(pre)]
-            while 1:
-                if not post:
-                    break
-                if post[-1] == '0':
-                    post = post[:-1]
-                else:
-                    break
-            if not post:
-                return pre
-            return '%s.%s' % (pre,post)
-            
+            return self._noZeroRound(float(value),amount)
         else:
             dbg('no pattern found (%s)' % style)
             raise ValueError, 'Invalid token type: %s' % style
         
+    def _noZeroRound(self,number,lenght):
+        rounded = round(number,lenght)
+        pre,post = str(rounded).split('.')
+        rpost = ''
+        end = len(post)
+        for ix in range(end):
+            rpost += post[end - 1 - ix]
+        ipost = int(rpost)
+        rpost = str(ipost)
+        end = len(rpost)
+        post = ''
+        for ix in range(end):
+            post += rpost[end - 1 - ix]
+        if post == '0':
+            return pre
+        return '%s.%s' % (pre,post)
+        
     def getTokens(self,s):
         pattern = re.compile('[$][(]?\w?[.]?[!]?[?]?[!?]?\d?[)]?\w*[$]')
         return map(lambda x: (x[x.find(')') + 1 if ')' in x else 1:-1],x[2:x.find(')')] if '(' in x else 's',x),pattern.findall(s))
-text = TextConverter('en')
+text = TextConverter(scfg.language)
 
 ##############################
 ### DYNAMIC CONFIGURATION  ###
